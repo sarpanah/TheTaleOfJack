@@ -1,0 +1,12 @@
+# ninja log v5
+88	1308	7666203526233225	FramePacing/CMakeFiles/swappywrapper.dir/UnitySwappyWrapper.cpp.o	98d5329bea8291b5
+1311	2327	7666203538421606	C:/Unity Projects/TheTaleOfJack/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/e212c1i6/obj/arm64-v8a/libswappywrapper.so	ff1ba8e7fbbe516a
+30	2486	7666203540261607	GameActivity/CMakeFiles/game.dir/UGAInputKeyEvent.cpp.o	74a953f67fa4b7f0
+65	2565	7666203541059124	GameActivity/CMakeFiles/game.dir/UGAInputMotionEvent.cpp.o	10c1f578e74efcc0
+38	2586	7666203540898870	GameActivity/CMakeFiles/game.dir/UGAEntry.cpp.o	fe097abf91018775
+9	2610	7666203541393971	GameActivity/CMakeFiles/game.dir/UGAConfiguration.cpp.o	968dc2367851b78a
+55	2758	7666203542820255	GameActivity/CMakeFiles/game.dir/UGASoftKeyboard.cpp.o	763cc4ec18f5d70d
+1	2948	7666203544862370	GameActivity/CMakeFiles/game.dir/UGADebug.cpp.o	fc36410253627b75
+46	3222	7666203547775290	GameActivity/CMakeFiles/game.dir/UGAInput.cpp.o	399d1f26b16c33cf
+18	3339	7666203549062393	GameActivity/CMakeFiles/game.dir/UGAApplication.cpp.o	40c59c24c5f11c71
+3340	3451	7666203550222518	C:/Unity Projects/TheTaleOfJack/Library/Bee/Android/Prj/IL2CPP/Gradle/unityLibrary/build/intermediates/cxx/RelWithDebInfo/e212c1i6/obj/arm64-v8a/libgame.so	5b0a82d9b3b5832f
