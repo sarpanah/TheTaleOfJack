@@ -195,12 +195,12 @@ public class PlayerMovement : MonoBehaviour
         {
             if (coyoteTimeCounter > 0f)
             {
-                Jump();
+                Jump(false); // Initial jump
                 jumpBufferCounter = 0f;
             }
             else if (canDoubleJump)
             {
-                Jump();
+                Jump(true); // Double jump
                 canDoubleJump = false;
                 jumpBufferCounter = 0f;
             }
@@ -209,9 +209,10 @@ public class PlayerMovement : MonoBehaviour
         if (isGrounded) jumpBufferCounter = 0f;
     }
 
-    private void Jump()
+    private void Jump(bool isDoubleJump)
     {
-        rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+        float force = isDoubleJump ? jumpForce * 0.8f : jumpForce;
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, force);
         jumpButtonReleased = false;
     }
 
