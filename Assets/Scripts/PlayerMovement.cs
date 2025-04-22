@@ -16,12 +16,20 @@ public class PlayerMovement : MonoBehaviour
     private float deceleration = 10f;
 
     [Header("Jump Settings")]
-    [SerializeField, Tooltip("Force applied when jumping")]
-    private float jumpForce = 12f;
+    [SerializeField, Tooltip("Initial jump velocity (units/sec)")]
+    private float jumpVelocity = 12f;
     [SerializeField, Tooltip("Initial coyote time window")]
     private float coyoteTime = 0.2f;
     [SerializeField, Tooltip("Time window to buffer jump input")]
     private float jumpBufferTime = 0.2f;
+
+    [Header("Gravity Settings")]
+    [SerializeField, Tooltip("Base gravity scale on Rigidbody2D")]
+    private float baseGravityScale = 3f;
+    [SerializeField, Tooltip("Gravity multiplier when falling")]
+    private float fallMultiplier = 2.5f;
+    [SerializeField, Tooltip("Gravity multiplier for low jumps (when jump released early)")]
+    private float lowJumpMultiplier = 2f;
 
     [Header("Ground Check")]
     [SerializeField, Tooltip("Transform for ground checking")]
@@ -75,10 +83,12 @@ public class PlayerMovement : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
+        rb.gravityScale = baseGravityScale;  // Set base gravity
     }
 
     private void Update()
     {
+        Debug.Log(isTouchingWall);
         if (!isControlEnabled)
         {
             movement = Vector2.zero;
@@ -104,6 +114,7 @@ public class PlayerMovement : MonoBehaviour
             fallTime = 0f;
 
         ApplyMovement();
+        HandleVariableGravity();  // Polished gravity adjustments
     }
 
     #endregion
@@ -211,9 +222,30 @@ public class PlayerMovement : MonoBehaviour
 
     private void Jump(bool isDoubleJump)
     {
-        float force = isDoubleJump ? jumpForce * 0.8f : jumpForce;
-        rb.linearVelocity = new Vector2(rb.linearVelocity.x, force);
+        float v = isDoubleJump ? jumpVelocity * 0.8f : jumpVelocity;
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, v);
         jumpButtonReleased = false;
+    }
+
+    #endregion
+
+    #region Variable Gravity
+
+    /// <summary>
+    /// Applies fall and low-jump multipliers for snappier jumps.
+    /// </summary>
+    private void HandleVariableGravity()
+    {
+        if (rb.linearVelocity.y < 0f)
+        {
+            // Faster fall
+            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1f) * Time.fixedDeltaTime;
+        }
+        else if (rb.linearVelocity.y > 0f && !(jumpButton != null && jumpButton.isPressed))
+        {
+            // Short hop when jump released early
+            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1f) * Time.fixedDeltaTime;
+        }
     }
 
     #endregion
