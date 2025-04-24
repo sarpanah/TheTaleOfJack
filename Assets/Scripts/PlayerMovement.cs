@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Handles player movement, jumping, and interactions for a 2D platformer game.
-/// Supports an arbitrary number of wall check points.
+/// Supports an arbitrary number of wall check points and subtle wall boost.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D), typeof(Animator))]
 public class PlayerMovement : MonoBehaviour
@@ -10,50 +10,36 @@ public class PlayerMovement : MonoBehaviour
     #region Serialized Fields
 
     [Header("Movement Settings")]
-    [SerializeField, Tooltip("Horizontal movement speed")]
-    private float moveSpeed = 5f;
-    [SerializeField, Tooltip("Deceleration when no input is given (meters/second²)")]
-    private float deceleration = 10f;
+    [SerializeField, Tooltip("Horizontal movement speed")] private float moveSpeed = 5f;
+    [SerializeField, Tooltip("Deceleration when no input is given (meters/second²)")] private float deceleration = 10f;
 
     [Header("Jump Settings")]
-    [SerializeField, Tooltip("Initial jump velocity (units/sec)")]
-    private float jumpVelocity = 12f;
-    [SerializeField, Tooltip("Initial coyote time window")]
-    private float coyoteTime = 0.2f;
-    [SerializeField, Tooltip("Time window to buffer jump input")]
-    private float jumpBufferTime = 0.2f;
+    [SerializeField, Tooltip("Initial jump velocity (units/sec)")] private float jumpVelocity = 12f;
+    [SerializeField, Tooltip("Initial coyote time window")] private float coyoteTime = 0.2f;
+    [SerializeField, Tooltip("Time window to buffer jump input")] private float jumpBufferTime = 0.2f;
 
     [Header("Gravity Settings")]
-    [SerializeField, Tooltip("Base gravity scale on Rigidbody2D")]
-    private float baseGravityScale = 3f;
-    [SerializeField, Tooltip("Gravity multiplier when falling")]
-    private float fallMultiplier = 2.5f;
-    [SerializeField, Tooltip("Gravity multiplier for low jumps (when jump released early)")]
-    private float lowJumpMultiplier = 2f;
+    [SerializeField, Tooltip("Base gravity scale on Rigidbody2D")] private float baseGravityScale = 3f;
+    [SerializeField, Tooltip("Gravity multiplier when falling")] private float fallMultiplier = 2.5f;
+    [SerializeField, Tooltip("Gravity multiplier for low jumps (when jump released early)")] private float lowJumpMultiplier = 2f;
 
     [Header("Ground Check")]
-    [SerializeField, Tooltip("Transform for ground checking")]
-    private Transform groundCheck;
-    [SerializeField, Tooltip("Radius for ground check detection")]
-    private float groundCheckRadius = 0.2f;
-    [SerializeField, Tooltip("Layer mask for ground objects")]
-    private LayerMask groundLayer;
+    [SerializeField, Tooltip("Transform for ground checking")] private Transform groundCheck;
+    [SerializeField, Tooltip("Radius for ground check detection")] private float groundCheckRadius = 0.2f;
+    [SerializeField, Tooltip("Layer mask for ground objects")] private LayerMask groundLayer;
 
     [Header("Wall Check")]
-    [SerializeField, Tooltip("Transforms for wall checking (can assign 1..N points)")]
-    private Transform[] wallCheckPoints;
-    [SerializeField, Tooltip("Distance for wall detection")]
-    private float wallCheckDistance = 0.2f;
-    [SerializeField, Tooltip("Layer mask for wall objects")]
-    private LayerMask wallLayer;
+    [SerializeField, Tooltip("Transforms for wall checking (can assign 1..N points)")] private Transform[] wallCheckPoints;
+    [SerializeField, Tooltip("Distance for wall detection")] private float wallCheckDistance = 0.2f;
+    [SerializeField, Tooltip("Layer mask for wall objects")] private LayerMask wallLayer;
+
+    [Header("Wall Boost Settings")]
+    [SerializeField, Tooltip("Vertical boost applied when hitting the wall at the middle point")] private float wallBoostVelocity = 1f;
 
     [Header("Touch Controls")]
-    [SerializeField, Tooltip("Button for moving left")]
-    private TouchButton moveLeftButton;
-    [SerializeField, Tooltip("Button for moving right")]
-    private TouchButton moveRightButton;
-    [SerializeField, Tooltip("Button for jumping")]
-    private TouchButton jumpButton;
+    [SerializeField, Tooltip("Button for moving left")] private TouchButton moveLeftButton;
+    [SerializeField, Tooltip("Button for moving right")] private TouchButton moveRightButton;
+    [SerializeField, Tooltip("Button for jumping")] private TouchButton jumpButton;
 
     #endregion
 
@@ -73,6 +59,9 @@ public class PlayerMovement : MonoBehaviour
     private float fallTime = 0f;
     private bool isTouchingWall;
 
+    // Tracks if boost has been applied during current wall touch
+    private bool wallBoostApplied;
+
     private const float fallThreshold = -0.1f;
 
     #endregion
@@ -88,7 +77,6 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
-        Debug.Log(isTouchingWall);
         if (!isControlEnabled)
         {
             movement = Vector2.zero;
@@ -259,16 +247,34 @@ public class PlayerMovement : MonoBehaviour
 
     private void UpdateWallCollision()
     {
-        isTouchingWall = false;
+        bool touchingWall = false;
+        int hitIndex = -1;
         Vector2 dir = isFacingRight ? Vector2.right : Vector2.left;
-        foreach (Transform point in wallCheckPoints)
+
+        for (int i = 0; i < wallCheckPoints.Length; i++)
         {
+            Transform point = wallCheckPoints[i];
             if (point == null) continue;
             if (Physics2D.Raycast(point.position, dir, wallCheckDistance, wallLayer))
             {
-                isTouchingWall = true;
+                touchingWall = true;
+                hitIndex = i;
                 break;
             }
+        }
+
+        // Reset boost when leaving wall
+        if (!touchingWall)
+            wallBoostApplied = false;
+
+        isTouchingWall = touchingWall;
+
+        // Subtle boost when hitting middle point
+        int middleIndex = wallCheckPoints.Length / 2;
+        if (touchingWall && !wallBoostApplied && hitIndex == middleIndex)
+        {
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y + wallBoostVelocity);
+            wallBoostApplied = true;
         }
     }
 
@@ -307,10 +313,14 @@ public class PlayerMovement : MonoBehaviour
         {
             Gizmos.color = Color.yellow;
             Vector2 dir = Application.isPlaying && isFacingRight ? Vector2.right : Vector2.left;
-            foreach (Transform point in wallCheckPoints)
+            for (int i = 0; i < wallCheckPoints.Length; i++)
             {
+                Transform point = wallCheckPoints[i];
                 if (point == null) continue;
                 Gizmos.DrawLine(point.position, point.position + (Vector3)dir * wallCheckDistance);
+                // Visualize middle point
+                if (i == wallCheckPoints.Length / 2)
+                    Gizmos.DrawWireSphere(point.position, 0.05f);
             }
         }
     }

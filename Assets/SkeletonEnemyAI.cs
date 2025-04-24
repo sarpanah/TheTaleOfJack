@@ -143,6 +143,9 @@ public class SkeletonEnemyAI2D : MonoBehaviour
 
     private bool CanSeePlayer()
     {
+        if(player==null){
+            return false;
+        }
         Vector2 eyePos = (Vector2)transform.position + eyeOffset;
         Vector2 dir    = ((Vector2)player.position - eyePos).normalized;
         RaycastHit2D hit = Physics2D.Raycast(eyePos, dir, detectionRange, visionMask);
