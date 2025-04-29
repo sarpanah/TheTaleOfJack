@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Handles player movement, jumping, and interactions for a 2D platformer game.
-/// Supports an arbitrary number of wall check points and subtle wall boost.
-/// </summary>
 [RequireComponent(typeof(Rigidbody2D), typeof(Animator))]
 public class PlayerMovement : MonoBehaviour
 {
@@ -40,6 +36,11 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField, Tooltip("Button for moving left")] private TouchButton moveLeftButton;
     [SerializeField, Tooltip("Button for moving right")] private TouchButton moveRightButton;
     [SerializeField, Tooltip("Button for jumping")] private TouchButton jumpButton;
+    [SerializeField, Tooltip("Button for moving up")] private TouchButton moveUpButton;
+    [SerializeField, Tooltip("Button for moving down")] private TouchButton moveDownButton;
+
+    [Header("Climbing Settings")]
+    [SerializeField, Tooltip("Vertical climbing speed")] private float climbSpeed = 3f;
 
     #endregion
 
@@ -58,9 +59,10 @@ public class PlayerMovement : MonoBehaviour
     private bool isControlEnabled = true;
     private float fallTime = 0f;
     private bool isTouchingWall;
-
-    // Tracks if boost has been applied during current wall touch
     private bool wallBoostApplied;
+    private bool isClimbing = false;
+    private bool canClimb = false;
+    private Vector2 wallDirection;
 
     private const float fallThreshold = -0.1f;
 
@@ -77,18 +79,41 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
-        if (!isControlEnabled)
+        // Check for climbing activation
+        if (!isClimbing && canClimb && movement.x != 0f)
         {
-            movement = Vector2.zero;
-            animator.SetBool("isRunning", false);
-            return;
+            // Climb only if player is pressing toward the wall's direction
+            if ((movement.x > 0f && wallDirection.x > 0f) || (movement.x < 0f && wallDirection.x < 0f))
+            {
+                isClimbing = true;
+                rb.gravityScale = 6.5f;
+                animator.SetBool("isClimbing", true);
+            }
         }
 
         UpdateGroundedState();
+
+        // Exit climbing if grounded
+        if (isClimbing && isGrounded)
+        {
+            isClimbing = false;
+            rb.gravityScale = baseGravityScale;
+            animator.SetBool("isClimbing", false);
+        }
+
         UpdateWallCollision();
         HandleJumpTiming();
         HandleJumping();
         HandleInput();
+
+        // Enter climbing if overlapping climbable wall and pressing towards it
+        if (!isClimbing && canClimb && movement.x != 0f && (movement.x > 0f == (wallDirection.x > 0f)))
+        {
+            isClimbing = true;
+            rb.gravityScale = 6.5f;
+            animator.SetBool("isClimbing", true);
+        }
+
         HandleAnimationAndFlipping();
     }
 
@@ -96,13 +121,66 @@ public class PlayerMovement : MonoBehaviour
     {
         if (!isControlEnabled) return;
 
-        if (rb.linearVelocity.y < 0f)
+        if (rb.linearVelocity.y < 0f && !isClimbing)
             fallTime += Time.fixedDeltaTime;
         else
             fallTime = 0f;
 
         ApplyMovement();
-        HandleVariableGravity();  // Polished gravity adjustments
+        if (!isClimbing) HandleVariableGravity();  // Skip gravity adjustments when climbing
+    }
+    #endregion
+
+    #region Colliders & Triggers
+
+    private void OnTriggerEnter2D(Collider2D other)
+{
+    if (other.CompareTag("ClimbableWall"))
+    {
+        canClimb = true;
+        BoxCollider2D wallCollider = other.GetComponent<BoxCollider2D>();
+        if (wallCollider != null)
+        {
+            Vector2 playerPos = transform.position;
+            Vector2 wallCenter = wallCollider.bounds.center;
+            float wallLeft = wallCenter.x - wallCollider.bounds.extents.x;
+            float wallRight = wallCenter.x + wallCollider.bounds.extents.x;
+
+            // Determine which side of the wall the player is on
+            if (playerPos.x < wallLeft)
+            {
+                wallDirection = Vector2.right; // Player is left of wall, wall is to the right
+            }
+            else if (playerPos.x > wallRight)
+            {
+                wallDirection = Vector2.left; // Player is right of wall, wall is to the left
+            }
+            else
+            {
+                // Player is within the wall's bounds (e.g., overlapping), use movement direction
+                wallDirection = movement.x > 0 ? Vector2.right : Vector2.left;
+            }
+        }
+    }
+}
+
+    private void OnTriggerStay2D(Collider2D collision)
+    {
+        // Removed automatic climbing activation here
+    }
+
+    private void OnTriggerExit2D(Collider2D other)
+    {
+        if (other.CompareTag("ClimbableWall"))
+        {
+            canClimb = false;
+            if (isClimbing)
+            {
+                isClimbing = false;
+                rb.gravityScale = baseGravityScale;
+                animator.SetBool("isClimbing", false);
+            }
+        }
     }
 
     #endregion
@@ -111,18 +189,25 @@ public class PlayerMovement : MonoBehaviour
 
     private void HandleInput()
     {
-        if (moveLeftButton == null || moveRightButton == null) return;
+        if (moveLeftButton == null || moveRightButton == null || moveUpButton == null || moveDownButton == null) return;
 
         movement.x = moveLeftButton.isPressed ? -1f :
                      moveRightButton.isPressed ? 1f : 0f;
 
-        if (isTouchingWall && MovingTowardsWall())
+        movement.y = moveUpButton.isPressed ? 1f :
+                     moveDownButton.isPressed ? -1f : 0f;
+
+        if (isTouchingWall && MovingTowardsWall() && !isClimbing)
             movement.x = 0f;
     }
 
     private void ApplyMovement()
     {
-        if (isTouchingWall && ((rb.linearVelocity.x > 0f && isFacingRight) || (rb.linearVelocity.x < 0f && !isFacingRight)))
+        if (isClimbing)
+        {
+            rb.linearVelocity = new Vector2(0f, movement.y * climbSpeed);
+        }
+        else if (isTouchingWall && ((rb.linearVelocity.x > 0f && isFacingRight) || (rb.linearVelocity.x < 0f && !isFacingRight)))
         {
             rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
         }
@@ -139,18 +224,25 @@ public class PlayerMovement : MonoBehaviour
 
     private void HandleAnimationAndFlipping()
     {
-        bool isRunning = Mathf.Abs(movement.x) > 0.01f;
-        animator.SetBool("isRunning", isRunning);
-
-        float vy = rb.linearVelocity.y;
-        bool isJumping = vy > 0.1f;
-        bool isFalling  = vy < fallThreshold;
-
-        animator.SetBool("isJumping", isJumping);
-        animator.SetBool("isFalling", isFalling);
-
-        if (movement.x > 0f && !isFacingRight) Flip();
-        else if (movement.x < 0f && isFacingRight) Flip();
+        if (isClimbing)
+        {
+            bool IsClimbing = rb.linearVelocity.y != 0f;
+            animator.SetBool("isClimbing", true);
+            animator.SetBool("isJumping", false);
+        }
+        else
+        {
+            animator.SetBool("isClimbing", false);
+            bool isRunning = movement.x != 0f;
+            animator.SetBool("isRunning", isRunning);
+            float vy = rb.linearVelocity.y;
+            bool isJumping = vy > 0.1f;
+            bool isFalling = vy < fallThreshold;
+            animator.SetBool("isJumping", isJumping);
+            animator.SetBool("isFalling", isFalling);
+            if (movement.x > 0f && !isFacingRight) Flip();
+            else if (movement.x < 0f && isFacingRight) Flip();
+        }
     }
 
     private void Flip()
@@ -192,7 +284,16 @@ public class PlayerMovement : MonoBehaviour
     {
         if (jumpBufferCounter > 0f)
         {
-            if (coyoteTimeCounter > 0f)
+            if (isClimbing)
+            {
+                isClimbing = false;
+                rb.gravityScale = baseGravityScale;
+                float horizontalJump = movement.x * moveSpeed;
+                rb.linearVelocity = new Vector2(horizontalJump, jumpVelocity);
+                jumpBufferCounter = 0f;
+                animator.SetBool("isClimbing", false);
+            }
+            else if (coyoteTimeCounter > 0f)
             {
                 Jump(false); // Initial jump
                 jumpBufferCounter = 0f;
@@ -219,19 +320,14 @@ public class PlayerMovement : MonoBehaviour
 
     #region Variable Gravity
 
-    /// <summary>
-    /// Applies fall and low-jump multipliers for snappier jumps.
-    /// </summary>
     private void HandleVariableGravity()
     {
         if (rb.linearVelocity.y < 0f)
         {
-            // Faster fall
             rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1f) * Time.fixedDeltaTime;
         }
         else if (rb.linearVelocity.y > 0f && !(jumpButton != null && jumpButton.isPressed))
         {
-            // Short hop when jump released early
             rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1f) * Time.fixedDeltaTime;
         }
     }
@@ -247,6 +343,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void UpdateWallCollision()
     {
+        if (isClimbing) return; // Skip wall collision checks when climbing
+
         bool touchingWall = false;
         int hitIndex = -1;
         Vector2 dir = isFacingRight ? Vector2.right : Vector2.left;
@@ -263,13 +361,11 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
-        // Reset boost when leaving wall
         if (!touchingWall)
             wallBoostApplied = false;
 
         isTouchingWall = touchingWall;
 
-        // Subtle boost when hitting middle point
         int middleIndex = wallCheckPoints.Length / 2;
         if (touchingWall && !wallBoostApplied && hitIndex == middleIndex)
         {
@@ -318,7 +414,6 @@ public class PlayerMovement : MonoBehaviour
                 Transform point = wallCheckPoints[i];
                 if (point == null) continue;
                 Gizmos.DrawLine(point.position, point.position + (Vector3)dir * wallCheckDistance);
-                // Visualize middle point
                 if (i == wallCheckPoints.Length / 2)
                     Gizmos.DrawWireSphere(point.position, 0.05f);
             }
