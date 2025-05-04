@@ -122,6 +122,15 @@ public class PlayerAttack : MonoBehaviour
             }
         }
 
+        if (collision.CompareTag("Box"))
+        {
+            var box = collision.GetComponent<Box>();
+            if (box != null)
+            {
+                box.BreakBox();
+            }
+        }
+
         // Uncomment to trigger camera shake and vibration on a successful hit:
         // if (hitSuccess) TriggerFeedbackEffects();
     }

@@ -8,6 +8,7 @@ TagManager:
   - Enemy
   - PlayerNoCollision
   - ClimbableWall
+  - Box
   layers:
   - Default
   - TransparentFX
