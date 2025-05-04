@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Timeline;
 
 /// <summary>
 /// Manages the health, damage reactions, and death behavior for a Skeleton enemy.
@@ -16,6 +17,12 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
     [Header("Death Settings")]    
     [Tooltip("Time (in seconds) before the skeleton is destroyed after death.")]
     [SerializeField] private float destroyDelay = 3f;
+
+    [Header("No-Collision Settings")]
+    [Tooltip("Tag to assign to the Player GameObject when attack is active")]
+    [SerializeField] private string nonCollisionTag = "NoCollision";
+
+    public GameObject coinPrefab;
 
     private int currentHealth;
     private bool isDead;
@@ -83,8 +90,11 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
         {
             if (script != this)
                 script.enabled = false;
+                gameObject.tag = nonCollisionTag;
         }
 
+        SetTagAndLayerRecursively(this.gameObject, nonCollisionTag, nonCollisionTag);
+        Instantiate(coinPrefab, transform.position, Quaternion.identity);
         // Destroy the game object after a delay to allow death animation to play
         Destroy(gameObject, destroyDelay);
     }
@@ -97,4 +107,25 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
         currentHealth = Mathf.Min(currentHealth + healAmount, maxHealth);
     }
     #endregion
+
+
+    void SetTagAndLayerRecursively(GameObject obj, string tag, string layerName)
+    {
+        obj.tag = tag;
+
+        int layer = LayerMask.NameToLayer(layerName);
+        if (layer == -1)
+        {
+            Debug.LogError($"Layer '{layerName}' does not exist.");
+            return;
+        }
+
+        obj.layer = layer;
+
+        foreach (Transform child in obj.transform)
+        {
+            SetTagAndLayerRecursively(child.gameObject, tag, layerName);
+        }
+    }
+
 }

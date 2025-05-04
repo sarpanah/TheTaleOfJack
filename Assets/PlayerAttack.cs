@@ -127,7 +127,8 @@ public class PlayerAttack : MonoBehaviour
             var box = collision.GetComponent<Box>();
             if (box != null)
             {
-                box.BreakBox();
+                Vector2 attackDirection = transform.localScale.x > 0 ? Vector2.right : Vector2.left; // or use velocity or facing
+                box.BreakBox(attackDirection);
             }
         }
 
