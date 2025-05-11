@@ -50,6 +50,8 @@ public class PlayerHealthManager : MonoBehaviour
         // Play hit reaction animation
         animator.SetTrigger("Hit");
 
+        TriggerFeedbackEffects();
+
         // Optionally, you could play a sound effect or spawn particles here
         // e.g., AudioSource.PlayClipAtPoint(hitSound, transform.position);
 
@@ -68,7 +70,7 @@ public class PlayerHealthManager : MonoBehaviour
         isDead = true;
 
         // Trigger death animation
-        animator.SetTrigger("Death");
+        animator.SetBool("IsDead", true);
 
         // Disable collider to prevent further hits
         Collider col = GetComponent<Collider>();
@@ -97,4 +99,28 @@ public class PlayerHealthManager : MonoBehaviour
         currentHealth = Mathf.Min(currentHealth + healAmount, maxHealth);
     }
     #endregion
+
+    private void TriggerFeedbackEffects()
+        {
+            Debug.Log("SHIT CALLED");
+            // Camera shake
+            if (CameraShakeManager.Instance != null)
+            {
+                CameraShakeManager.Instance.ShakeCamera();
+            }
+            else
+            {
+                Debug.LogWarning("CameraShakeManager not found in scene.");
+            }
+
+            // Vibration (light tier)
+            if (VibrationManager.Instance != null)
+            {
+                VibrationManager.Instance.Vibrate(VibrationIntensity.Light);
+            }
+            else
+            {
+                Debug.LogWarning("VibrationManager not found in scene.");
+            }
+    }
 }

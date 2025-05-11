@@ -14,6 +14,7 @@ public class Box : MonoBehaviour
     public void BreakBox(Vector2 throwDirection)
     {
         SpawnCoin(throwDirection);
+        TriggerFeedbackEffects();
         Destroy(gameObject);
     }
     private void SpawnCoin(Vector2 direction)
@@ -24,5 +25,29 @@ public class Box : MonoBehaviour
     {
         coinScript.Throw(direction);
     }
+    }
+
+    private void TriggerFeedbackEffects()
+        {
+            Debug.Log("SHIT CALLED");
+            // Camera shake
+            if (CameraShakeManager.Instance != null)
+            {
+                CameraShakeManager.Instance.ShakeCamera();
+            }
+            else
+            {
+                Debug.LogWarning("CameraShakeManager not found in scene.");
+            }
+
+            // Vibration (light tier)
+            if (VibrationManager.Instance != null)
+            {
+                VibrationManager.Instance.Vibrate(VibrationIntensity.Light);
+            }
+            else
+            {
+                Debug.LogWarning("VibrationManager not found in scene.");
+            }
     }
 }

@@ -6,41 +6,41 @@ public class PlayerMovement : MonoBehaviour
     #region Serialized Fields
 
     [Header("Movement Settings")]
-    [SerializeField, Tooltip("Horizontal movement speed")] private float moveSpeed = 5f;
-    [SerializeField, Tooltip("Deceleration when no input is given (meters/second²)")] private float deceleration = 10f;
+    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float deceleration = 10f;
 
     [Header("Jump Settings")]
-    [SerializeField, Tooltip("Initial jump velocity (units/sec)")] private float jumpVelocity = 12f;
-    [SerializeField, Tooltip("Initial coyote time window")] private float coyoteTime = 0.2f;
-    [SerializeField, Tooltip("Time window to buffer jump input")] private float jumpBufferTime = 0.2f;
+    [SerializeField] private float jumpVelocity = 12f;
+    [SerializeField] private float coyoteTime = 0.2f;
+    [SerializeField] private float jumpBufferTime = 0.2f;
 
     [Header("Gravity Settings")]
-    [SerializeField, Tooltip("Base gravity scale on Rigidbody2D")] private float baseGravityScale = 3f;
-    [SerializeField, Tooltip("Gravity multiplier when falling")] private float fallMultiplier = 2.5f;
-    [SerializeField, Tooltip("Gravity multiplier for low jumps (when jump released early)")] private float lowJumpMultiplier = 2f;
+    [SerializeField] private float baseGravityScale = 3f;
+    [SerializeField] private float fallMultiplier = 2.5f;
+    [SerializeField] private float lowJumpMultiplier = 2f;
 
     [Header("Ground Check")]
-    [SerializeField, Tooltip("Transform for ground checking")] private Transform groundCheck;
-    [SerializeField, Tooltip("Radius for ground check detection")] private float groundCheckRadius = 0.2f;
-    [SerializeField, Tooltip("Layer mask for ground objects")] private LayerMask groundLayer;
+    [SerializeField] private Transform groundCheck;
+    [SerializeField] private float groundCheckRadius = 0.2f;
+    [SerializeField] private LayerMask groundLayer;
 
     [Header("Wall Check")]
-    [SerializeField, Tooltip("Transforms for wall checking (can assign 1..N points)")] private Transform[] wallCheckPoints;
-    [SerializeField, Tooltip("Distance for wall detection")] private float wallCheckDistance = 0.2f;
-    [SerializeField, Tooltip("Layer mask for wall objects")] private LayerMask wallLayer;
+    [SerializeField] private Transform[] wallCheckPoints;
+    [SerializeField] private float wallCheckDistance = 0.2f;
+    [SerializeField] private LayerMask wallLayer;
 
     [Header("Wall Boost Settings")]
-    [SerializeField, Tooltip("Vertical boost applied when hitting the wall at the middle point")] private float wallBoostVelocity = 1f;
+    [SerializeField] private float wallBoostVelocity = 1f;
 
     [Header("Touch Controls")]
-    [SerializeField, Tooltip("Button for moving left")] private TouchButton moveLeftButton;
-    [SerializeField, Tooltip("Button for moving right")] private TouchButton moveRightButton;
-    [SerializeField, Tooltip("Button for jumping")] private TouchButton jumpButton;
-    [SerializeField, Tooltip("Button for moving up")] private TouchButton moveUpButton;
-    [SerializeField, Tooltip("Button for moving down")] private TouchButton moveDownButton;
+    [SerializeField] private TouchButton moveLeftButton;
+    [SerializeField] private TouchButton moveRightButton;
+    [SerializeField] private TouchButton jumpButton;
+    [SerializeField] private TouchButton moveUpButton;
+    [SerializeField] private TouchButton moveDownButton;
 
     [Header("Climbing Settings")]
-    [SerializeField, Tooltip("Vertical climbing speed")] private float climbSpeed = 3f;
+    [SerializeField] private float climbSpeed = 3f;
 
     #endregion
 
@@ -63,8 +63,7 @@ public class PlayerMovement : MonoBehaviour
     private bool isClimbing = false;
     private bool canClimb = false;
     private Vector2 wallDirection;
-
-    private const float fallThreshold = -0.1f;
+    private bool wasGrounded;
 
     #endregion
 
@@ -74,99 +73,60 @@ public class PlayerMovement : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
-        rb.gravityScale = baseGravityScale;  // Set base gravity
+        rb.gravityScale = baseGravityScale;
     }
 
     private void Update()
     {
-        // Check for climbing activation
         if (!isClimbing && canClimb && movement.x != 0f)
         {
-            // Climb only if player is pressing toward the wall's direction
             if ((movement.x > 0f && wallDirection.x > 0f) || (movement.x < 0f && wallDirection.x < 0f))
             {
-                isClimbing = true;
-                rb.gravityScale = 6.5f;
-                animator.SetBool("isClimbing", true);
+                StartClimbing();
             }
         }
 
         UpdateGroundedState();
-
-        // Exit climbing if grounded
-        if (isClimbing && isGrounded)
-        {
-            isClimbing = false;
-            rb.gravityScale = baseGravityScale;
-            animator.SetBool("isClimbing", false);
-        }
-
         UpdateWallCollision();
         HandleJumpTiming();
         HandleJumping();
         HandleInput();
 
-        // Enter climbing if overlapping climbable wall and pressing towards it
-        if (!isClimbing && canClimb && movement.x != 0f && (movement.x > 0f == (wallDirection.x > 0f)))
+        if (isClimbing && isGrounded)
         {
-            isClimbing = true;
-            rb.gravityScale = 6.5f;
-            animator.SetBool("isClimbing", true);
+            StopClimbing();
         }
 
         HandleAnimationAndFlipping();
+        wasGrounded = isGrounded;
     }
 
     private void FixedUpdate()
     {
         if (!isControlEnabled) return;
 
-        if (rb.linearVelocity.y < 0f && !isClimbing)
+        if (rb.linearVelocity.y < -0.5f && !isClimbing)
             fallTime += Time.fixedDeltaTime;
         else
             fallTime = 0f;
 
         ApplyMovement();
-        if (!isClimbing) HandleVariableGravity();  // Skip gravity adjustments when climbing
+        
+        if (!isClimbing) 
+            HandleVariableGravity();
     }
+
     #endregion
 
-    #region Colliders & Triggers
+    #region Collision Detection
 
     private void OnTriggerEnter2D(Collider2D other)
-{
-    if (other.CompareTag("ClimbableWall"))
     {
-        canClimb = true;
-        BoxCollider2D wallCollider = other.GetComponent<BoxCollider2D>();
-        if (wallCollider != null)
+        if (other.CompareTag("ClimbableWall"))
         {
-            Vector2 playerPos = transform.position;
-            Vector2 wallCenter = wallCollider.bounds.center;
-            float wallLeft = wallCenter.x - wallCollider.bounds.extents.x;
-            float wallRight = wallCenter.x + wallCollider.bounds.extents.x;
-
-            // Determine which side of the wall the player is on
-            if (playerPos.x < wallLeft)
-            {
-                wallDirection = Vector2.right; // Player is left of wall, wall is to the right
-            }
-            else if (playerPos.x > wallRight)
-            {
-                wallDirection = Vector2.left; // Player is right of wall, wall is to the left
-            }
-            else
-            {
-                // Player is within the wall's bounds (e.g., overlapping), use movement direction
-                wallDirection = movement.x > 0 ? Vector2.right : Vector2.left;
-            }
+            canClimb = true;
+            CalculateWallDirection(other);
         }
-    }
-}
-
-    private void OnTriggerStay2D(Collider2D collision)
-    {
-        // Removed automatic climbing activation here
     }
 
     private void OnTriggerExit2D(Collider2D other)
@@ -174,12 +134,7 @@ public class PlayerMovement : MonoBehaviour
         if (other.CompareTag("ClimbableWall"))
         {
             canClimb = false;
-            if (isClimbing)
-            {
-                isClimbing = false;
-                rb.gravityScale = baseGravityScale;
-                animator.SetBool("isClimbing", false);
-            }
+            if (isClimbing) StopClimbing();
         }
     }
 
@@ -189,13 +144,10 @@ public class PlayerMovement : MonoBehaviour
 
     private void HandleInput()
     {
-        if (moveLeftButton == null || moveRightButton == null || moveUpButton == null || moveDownButton == null) return;
+        if (!moveLeftButton || !moveRightButton || !moveUpButton || !moveDownButton) return;
 
-        movement.x = moveLeftButton.isPressed ? -1f :
-                     moveRightButton.isPressed ? 1f : 0f;
-
-        movement.y = moveUpButton.isPressed ? 1f :
-                     moveDownButton.isPressed ? -1f : 0f;
+        movement.x = moveLeftButton.isPressed ? -1f : moveRightButton.isPressed ? 1f : 0f;
+        movement.y = moveUpButton.isPressed ? 1f : moveDownButton.isPressed ? -1f : 0f;
 
         if (isTouchingWall && MovingTowardsWall() && !isClimbing)
             movement.x = 0f;
@@ -217,38 +169,58 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
-            float vx = Mathf.MoveTowards(rb.linearVelocity.x, 0f, deceleration * Time.fixedDeltaTime);
-            rb.linearVelocity = new Vector2(vx, rb.linearVelocity.y);
+            rb.linearVelocity = new Vector2(Mathf.MoveTowards(rb.linearVelocity.x, 0f, deceleration * Time.fixedDeltaTime), rb.linearVelocity.y);
         }
     }
+
+    #endregion
+
+    #region Animation & Visuals
 
     private void HandleAnimationAndFlipping()
     {
         if (isClimbing)
         {
-            bool IsClimbing = rb.linearVelocity.y != 0f;
             animator.SetBool("isClimbing", true);
             animator.SetBool("isJumping", false);
+            animator.SetBool("isFalling", false);
         }
         else
         {
             animator.SetBool("isClimbing", false);
-            bool isRunning = movement.x != 0f;
+            
+            // Horizontal movement
+            bool isRunning = Mathf.Abs(movement.x) > 0.1f;
             animator.SetBool("isRunning", isRunning);
+
+            // Vertical states
             float vy = rb.linearVelocity.y;
-            bool isJumping = vy > 0.1f;
-            bool isFalling = vy < fallThreshold;
+            bool isJumping = vy > 1f;
+            bool isFalling = !isGrounded && vy < -1f;
+
+            // Landing detection
+            if (!wasGrounded && isGrounded)
+            {
+                animator.SetTrigger("Land");
+                isJumping = false;
+                isFalling = false;
+            }
+
             animator.SetBool("isJumping", isJumping);
             animator.SetBool("isFalling", isFalling);
-            if (movement.x > 0f && !isFacingRight) Flip();
-            else if (movement.x < 0f && isFacingRight) Flip();
+
+            // Character flipping
+            if (movement.x > 0.1f && !isFacingRight) Flip();
+            else if (movement.x < -0.1f && isFacingRight) Flip();
         }
     }
 
     private void Flip()
     {
         isFacingRight = !isFacingRight;
-        transform.localScale = new Vector3(-transform.localScale.x, transform.localScale.y, transform.localScale.z);
+        Vector3 scale = transform.localScale;
+        scale.x *= -1;
+        transform.localScale = scale;
     }
 
     #endregion
@@ -263,21 +235,27 @@ public class PlayerMovement : MonoBehaviour
             canDoubleJump = true;
             jumpBufferCounter = 0f;
         }
-        else coyoteTimeCounter -= Time.deltaTime;
-
-        if (jumpButton != null)
+        else
         {
-            if (jumpButton.isPressed && jumpButtonReleased && !jumpButtonHeld)
+            coyoteTimeCounter -= Time.deltaTime;
+        }
+
+        if (jumpButton && jumpButton.isPressed)
+        {
+            if (jumpButtonReleased)
             {
                 jumpBufferCounter = jumpBufferTime;
                 jumpButtonHeld = true;
-            }
-            else if (!jumpButton.isPressed)
-            {
-                jumpButtonHeld = false;
-                jumpButtonReleased = true;
+                jumpButtonReleased = false;
             }
         }
+        else
+        {
+            jumpButtonReleased = true;
+            jumpButtonHeld = false;
+        }
+
+        jumpBufferCounter -= Time.deltaTime;
     }
 
     private void HandleJumping()
@@ -286,47 +264,55 @@ public class PlayerMovement : MonoBehaviour
         {
             if (isClimbing)
             {
-                isClimbing = false;
-                rb.gravityScale = baseGravityScale;
-                float horizontalJump = movement.x * moveSpeed;
-                rb.linearVelocity = new Vector2(horizontalJump, jumpVelocity);
-                jumpBufferCounter = 0f;
-                animator.SetBool("isClimbing", false);
+                WallJump();
             }
             else if (coyoteTimeCounter > 0f)
             {
-                Jump(false); // Initial jump
+                Jump(false);
                 jumpBufferCounter = 0f;
             }
             else if (canDoubleJump)
             {
-                Jump(true); // Double jump
+                Jump(true);
                 canDoubleJump = false;
                 jumpBufferCounter = 0f;
             }
         }
-
-        if (isGrounded) jumpBufferCounter = 0f;
     }
 
     private void Jump(bool isDoubleJump)
     {
-        float v = isDoubleJump ? jumpVelocity * 0.8f : jumpVelocity;
-        rb.linearVelocity = new Vector2(rb.linearVelocity.x, v);
-        jumpButtonReleased = false;
+        float jumpPower = isDoubleJump ? jumpVelocity * 0.8f : jumpVelocity;
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpPower);
+        animator.SetBool("isJumping", true);
+        animator.SetBool("isFalling", false);
+    }
+
+    private void WallJump()
+    {
+        isClimbing = false;
+        rb.gravityScale = baseGravityScale;
+        float horizontalJump = movement.x * moveSpeed;
+        rb.linearVelocity = new Vector2(horizontalJump, jumpVelocity);
+        animator.SetBool("isClimbing", false);
+        canDoubleJump = true; // Enable double jump after wall jump
     }
 
     #endregion
 
-    #region Variable Gravity
+    #region Gravity & Physics
 
     private void HandleVariableGravity()
     {
         if (rb.linearVelocity.y < 0f)
         {
-            rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1f) * Time.fixedDeltaTime;
+            if (!isGrounded)
+            {
+                rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (fallMultiplier - 1f) * Time.fixedDeltaTime;
+                animator.SetBool("isFalling", true);
+            }
         }
-        else if (rb.linearVelocity.y > 0f && !(jumpButton != null && jumpButton.isPressed))
+        else if (rb.linearVelocity.y > 0f && !jumpButtonHeld)
         {
             rb.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1f) * Time.fixedDeltaTime;
         }
@@ -334,44 +320,62 @@ public class PlayerMovement : MonoBehaviour
 
     #endregion
 
-    #region Collision Detection
+    #region Ground & Wall Detection
 
     private void UpdateGroundedState()
     {
-        isGrounded = Physics2D.Raycast(groundCheck.position, Vector2.down, groundCheckRadius, groundLayer);
+        isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
+        animator.SetBool("IsGrounded", isGrounded);
     }
 
     private void UpdateWallCollision()
     {
-        if (isClimbing) return; // Skip wall collision checks when climbing
+        if (isClimbing) return;
 
         bool touchingWall = false;
-        int hitIndex = -1;
         Vector2 dir = isFacingRight ? Vector2.right : Vector2.left;
 
-        for (int i = 0; i < wallCheckPoints.Length; i++)
+        foreach (Transform point in wallCheckPoints)
         {
-            Transform point = wallCheckPoints[i];
-            if (point == null) continue;
+            if (!point) continue;
             if (Physics2D.Raycast(point.position, dir, wallCheckDistance, wallLayer))
             {
                 touchingWall = true;
-                hitIndex = i;
                 break;
             }
         }
 
-        if (!touchingWall)
-            wallBoostApplied = false;
-
         isTouchingWall = touchingWall;
+    }
 
-        int middleIndex = wallCheckPoints.Length / 2;
-        if (touchingWall && !wallBoostApplied && hitIndex == middleIndex)
-        {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, rb.linearVelocity.y + wallBoostVelocity);
-            wallBoostApplied = true;
-        }
+    #endregion
+
+    #region Climbing System
+
+    private void StartClimbing()
+    {
+        isClimbing = true;
+        rb.gravityScale = 6.5f;
+        animator.SetBool("isClimbing", true);
+    }
+
+    private void StopClimbing()
+    {
+        isClimbing = false;
+        rb.gravityScale = baseGravityScale;
+        animator.SetBool("isClimbing", false);
+    }
+
+    private void CalculateWallDirection(Collider2D wall)
+    {
+        Vector2 playerPos = transform.position;
+        Vector2 wallCenter = wall.bounds.center;
+        float wallLeft = wallCenter.x - wall.bounds.extents.x;
+        float wallRight = wallCenter.x + wall.bounds.extents.x;
+
+        wallDirection = playerPos.x < wallLeft ? Vector2.right : 
+                       playerPos.x > wallRight ? Vector2.left : 
+                       movement.x > 0 ? Vector2.right : Vector2.left;
     }
 
     private bool MovingTowardsWall()
@@ -383,21 +387,9 @@ public class PlayerMovement : MonoBehaviour
 
     #region Control Management
 
-    public void DisableControl()
-    {
-        isControlEnabled = false;
-        rb.linearVelocity = Vector2.zero;
-    }
-
-    public void EnableControl()
-    {
-        isControlEnabled = true;
-    }
-
-    public void FreezePlayer()
-    {
-        rb.constraints = RigidbodyConstraints2D.FreezeAll;
-    }
+    public void DisableControl() => isControlEnabled = false;
+    public void EnableControl() => isControlEnabled = true;
+    public void FreezePlayer() => rb.constraints = RigidbodyConstraints2D.FreezeAll;
 
     #endregion
 
@@ -405,18 +397,15 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        if (wallCheckPoints != null)
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
+
+        Gizmos.color = Color.yellow;
+        Vector2 dir = Application.isPlaying && isFacingRight ? Vector2.right : Vector2.left;
+        foreach (Transform point in wallCheckPoints)
         {
-            Gizmos.color = Color.yellow;
-            Vector2 dir = Application.isPlaying && isFacingRight ? Vector2.right : Vector2.left;
-            for (int i = 0; i < wallCheckPoints.Length; i++)
-            {
-                Transform point = wallCheckPoints[i];
-                if (point == null) continue;
-                Gizmos.DrawLine(point.position, point.position + (Vector3)dir * wallCheckDistance);
-                if (i == wallCheckPoints.Length / 2)
-                    Gizmos.DrawWireSphere(point.position, 0.05f);
-            }
+            if (!point) continue;
+            Gizmos.DrawLine(point.position, point.position + (Vector3)dir * wallCheckDistance);
         }
     }
 
