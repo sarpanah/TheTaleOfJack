@@ -43,7 +43,7 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
             }
         }
     }
-
+    
     /// <summary>
     /// Applies damage to the skeleton. Triggers hit animation and checks for death.
     /// </summary>

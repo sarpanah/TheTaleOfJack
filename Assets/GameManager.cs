@@ -109,9 +109,4 @@ public class GameManager : MonoBehaviour
         PlayerPrefs.DeleteAll();
         SceneManager.LoadScene("Level1");
     }
-
-    void Update()
-    {
-        Debug.Log(Coins);
-    }
 }

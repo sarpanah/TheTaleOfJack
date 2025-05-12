@@ -32,6 +32,7 @@ public class Coin : MonoBehaviour
     Rigidbody2D rb = GetComponent<Rigidbody2D>();
     if (rb != null)
     {
+        VibrationManager.Instance.Vibrate(VibrationIntensity.VeryLight);
         rb.linearVelocity = Vector2.zero; // clear existing velocity if any
         rb.AddForce((direction.normalized + Vector2.up * 0.5f) * throwForce, ForceMode2D.Impulse);
     }

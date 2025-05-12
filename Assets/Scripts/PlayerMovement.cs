@@ -78,6 +78,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+
+        Debug.Log(rb.linearVelocity.x);
         if (!isClimbing && canClimb && movement.x != 0f)
         {
             if ((movement.x > 0f && wallDirection.x > 0f) || (movement.x < 0f && wallDirection.x < 0f))

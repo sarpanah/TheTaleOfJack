@@ -1,53 +1,67 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class Box : MonoBehaviour
 {
-    public GameObject coinPrefab; // Assign in Inspector
-    public Transform coinSpawnPoint; // Optional for offset
+    [SerializeField] private List<GameObject> spawnablePrefabs; // Editable list in Inspector
+    [SerializeField] private Transform spawnPoint; // Optional for offset
+    [SerializeField, Range(0f, 1f)] private float emptyBoxChance = 0.2f; // Chance for empty box
     private int destroyCounter = 0;
-
-    void Update()
-    {
-        Debug.Log(destroyCounter);
-    }
 
     public void BreakBox(Vector2 throwDirection)
     {
-        SpawnCoin(throwDirection);
+        SpawnItem(throwDirection);
         TriggerFeedbackEffects();
         Destroy(gameObject);
     }
-    private void SpawnCoin(Vector2 direction)
+
+    private void SpawnItem(Vector2 direction)
     {
-    GameObject coin = Instantiate(coinPrefab, coinSpawnPoint ? coinSpawnPoint.position : transform.position, Quaternion.identity);
-    var coinScript = coin.GetComponent<Coin>();
-    if (coinScript != null)
-    {
-        coinScript.Throw(direction);
-    }
+        // Check for empty box
+        if (Random.value < emptyBoxChance) return;
+
+        // Return if no prefabs assigned
+        if (spawnablePrefabs == null || spawnablePrefabs.Count == 0) return;
+
+        // Select random prefab from list
+        int randomIndex = Random.Range(0, spawnablePrefabs.Count);
+        GameObject selectedPrefab = spawnablePrefabs[randomIndex];
+
+        // Skip if prefab is null
+        if (selectedPrefab == null) return;
+
+        // Instantiate at spawn point or box position
+        Vector3 spawnPosition = spawnPoint ? spawnPoint.position : transform.position;
+        GameObject spawnedItem = Instantiate(selectedPrefab, spawnPosition, Quaternion.identity);
+
+        // Try to get Coin component and throw if it exists
+        var coinScript = spawnedItem.GetComponent<Coin>();
+        if (coinScript != null)
+        {
+            coinScript.Throw(direction);
+        }
     }
 
     private void TriggerFeedbackEffects()
+    {
+        // Camera shake
+        if (CameraShakeManager.Instance != null)
         {
-            Debug.Log("SHIT CALLED");
-            // Camera shake
-            if (CameraShakeManager.Instance != null)
-            {
-                CameraShakeManager.Instance.ShakeCamera();
-            }
-            else
-            {
-                Debug.LogWarning("CameraShakeManager not found in scene.");
-            }
+            CameraShakeManager.Instance.ShakeCamera();
+        }
+        else
+        {
+            Debug.LogWarning("CameraShakeManager not found in scene.");
+        }
 
-            // Vibration (light tier)
-            if (VibrationManager.Instance != null)
-            {
-                VibrationManager.Instance.Vibrate(VibrationIntensity.Light);
-            }
-            else
-            {
-                Debug.LogWarning("VibrationManager not found in scene.");
-            }
+        // Vibration (light tier)
+        if (VibrationManager.Instance != null)
+        {
+            VibrationManager.Instance.Vibrate(VibrationIntensity.Light);
+        }
+        else
+        {
+            Debug.LogWarning("VibrationManager not found in scene.");
+        }
     }
 }
