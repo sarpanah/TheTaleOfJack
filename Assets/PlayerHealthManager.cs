@@ -71,6 +71,8 @@ public class PlayerHealthManager : MonoBehaviour
 
         // Trigger death animation
         animator.SetBool("IsDead", true);
+        AndroidHapticManager.Instance.Vibrate(VibrationIntensity.VeryIntense);
+        CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Strong);
 
         // Disable collider to prevent further hits
         Collider col = GetComponent<Collider>();
@@ -106,7 +108,7 @@ public class PlayerHealthManager : MonoBehaviour
             // Camera shake
             if (CameraShakeManager.Instance != null)
             {
-                CameraShakeManager.Instance.ShakeCamera();
+                CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Medium);
             }
             else
             {
@@ -114,13 +116,13 @@ public class PlayerHealthManager : MonoBehaviour
             }
 
             // Vibration (light tier)
-            if (VibrationManager.Instance != null)
+            if (AndroidHapticManager.Instance != null)
             {
-                VibrationManager.Instance.Vibrate(VibrationIntensity.Light);
+                AndroidHapticManager.Instance.Vibrate(VibrationIntensity.Light);
             }
             else
             {
-                Debug.LogWarning("VibrationManager not found in scene.");
+                Debug.LogWarning("AndroidHapticManager not found in scene.");
             }
     }
 }

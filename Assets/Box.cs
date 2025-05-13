@@ -47,7 +47,7 @@ public class Box : MonoBehaviour
         // Camera shake
         if (CameraShakeManager.Instance != null)
         {
-            CameraShakeManager.Instance.ShakeCamera();
+            CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Light);
         }
         else
         {
@@ -55,9 +55,9 @@ public class Box : MonoBehaviour
         }
 
         // Vibration (light tier)
-        if (VibrationManager.Instance != null)
+        if (AndroidHapticManager.Instance != null)
         {
-            VibrationManager.Instance.Vibrate(VibrationIntensity.Light);
+            AndroidHapticManager.Instance.Vibrate(VibrationIntensity.Light);
         }
         else
         {

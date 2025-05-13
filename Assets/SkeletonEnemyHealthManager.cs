@@ -136,7 +136,7 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
             // Camera shake
             if (CameraShakeManager.Instance != null)
             {
-                CameraShakeManager.Instance.ShakeCamera();
+                CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Medium);
             }
             else
             {
@@ -144,13 +144,13 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
             }
 
             // Vibration (light tier)
-            if (VibrationManager.Instance != null)
+            if (AndroidHapticManager.Instance != null)
             {
-                VibrationManager.Instance.Vibrate(VibrationIntensity.Light);
+                AndroidHapticManager.Instance.Vibrate(VibrationIntensity.Light);
             }
             else
             {
-                Debug.LogWarning("VibrationManager not found in scene.");
+                Debug.LogWarning("AndroidHapticManager not found in scene.");
             }
     }
 }

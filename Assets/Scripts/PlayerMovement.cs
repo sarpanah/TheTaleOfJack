@@ -16,7 +16,7 @@ public class PlayerMovement : MonoBehaviour
 
     [Header("Gravity Settings")]
     [SerializeField] private float baseGravityScale = 3f;
-    [SerializeField] private float fallMultiplier = 2.5f;
+    [SerializeField] private float fallMultiplier = 2.5f; // Consider reducing to 1.5f or 2f for smoother fall
     [SerializeField] private float lowJumpMultiplier = 2f;
 
     [Header("Ground Check")]
@@ -64,6 +64,7 @@ public class PlayerMovement : MonoBehaviour
     private bool canClimb = false;
     private Vector2 wallDirection;
     private bool wasGrounded;
+    private float timeSinceJump = 0f; // Tracks time since last jump to delay fall transition
 
     #endregion
 
@@ -78,8 +79,6 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
-
-        Debug.Log(rb.linearVelocity.x);
         if (!isClimbing && canClimb && movement.x != 0f)
         {
             if ((movement.x > 0f && wallDirection.x > 0f) || (movement.x < 0f && wallDirection.x < 0f))
@@ -89,6 +88,17 @@ public class PlayerMovement : MonoBehaviour
         }
 
         UpdateGroundedState();
+
+        // Increment timeSinceJump when not grounded
+        if (!isGrounded)
+        {
+            timeSinceJump += Time.deltaTime;
+        }
+        else
+        {
+            timeSinceJump = 0f;
+        }
+
         UpdateWallCollision();
         HandleJumpTiming();
         HandleJumping();
@@ -198,7 +208,7 @@ public class PlayerMovement : MonoBehaviour
             // Vertical states
             float vy = rb.linearVelocity.y;
             bool isJumping = vy > 1f;
-            bool isFalling = !isGrounded && vy < -1f;
+            bool isFalling = !isGrounded && vy < -1f && timeSinceJump > 0.1f; // Delay fall transition
 
             // Landing detection
             if (!wasGrounded && isGrounded)
@@ -288,6 +298,7 @@ public class PlayerMovement : MonoBehaviour
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpPower);
         animator.SetBool("isJumping", true);
         animator.SetBool("isFalling", false);
+        timeSinceJump = 0f; // Reset on jump
     }
 
     private void WallJump()
@@ -298,6 +309,7 @@ public class PlayerMovement : MonoBehaviour
         rb.linearVelocity = new Vector2(horizontalJump, jumpVelocity);
         animator.SetBool("isClimbing", false);
         canDoubleJump = true; // Enable double jump after wall jump
+        timeSinceJump = 0f; // Reset on wall jump
     }
 
     #endregion
