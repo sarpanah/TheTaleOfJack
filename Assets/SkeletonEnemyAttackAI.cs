@@ -18,7 +18,16 @@ public class SkeletonAttackAI : MonoBehaviour
     [SerializeField] private Animator animator;
 
     private float lastAttackTime;
+    private PlayerHealthManager playerHealth;
+    private Transform player;
 
+    private void Awake()
+    {
+        player = GameObject.FindGameObjectWithTag("Player").transform;
+        playerHealth = player.GetComponent<PlayerHealthManager>();
+        if (playerHealth == null)
+            Debug.LogError("PlayerHealthManager missing on Player!");
+    }
     private void Start()
     {
         // Validate & initialize
@@ -75,7 +84,8 @@ public class SkeletonAttackAI : MonoBehaviour
             var playerHealth = collision.GetComponent<PlayerHealthManager>();
             if (playerHealth != null)
             {
-                playerHealth.TakeDamage(damageAmount);
+                Vector2 hitDirection = ((Vector2)player.position - (Vector2)transform.position).normalized;
+                playerHealth.TakeDamage(damageAmount, hitDirection);
             }
         }
     }

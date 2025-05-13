@@ -1,128 +1,134 @@
 using UnityEngine;
 
 /// <summary>
-/// Manages the health, damage reactions, and death behavior for a Skeleton enemy.
+/// Manages the health, damage reactions, knockback, and death behavior for a 2D character.
 /// </summary>
+[RequireComponent(typeof(Rigidbody2D))]
 public class PlayerHealthManager : MonoBehaviour
 {
-    [Header("Health Settings")]    
-    [Tooltip("Maximum health of the skeleton.")]
+    [Header("Health Settings")]
+    [Tooltip("Maximum health of the character.")]
     [SerializeField] private int maxHealth = 100;
 
-    [Header("Animation Settings")]    
+    [Header("Knockback Settings")]
+    [Tooltip("Force of knockback applied when hit.")]
+    [SerializeField] private float knockbackForce = 10f;
+    [Tooltip("Duration during which player control is disabled.")]
+    [SerializeField] private float knockbackDuration = 0.2f;
+
+    [Header("Animation Settings")]
     [Tooltip("Animator component for handling hit and death animations.")]
     [SerializeField] private Animator animator;
 
-    [Header("Death Settings")]    
-    [Tooltip("Time (in seconds) before the skeleton is destroyed after death.")]
+    [Header("Death Settings")]
+    [Tooltip("Time (in seconds) before the character is destroyed after death.")]
     [SerializeField] private float destroyDelay = 3f;
 
     private int currentHealth;
     public bool isDead;
+    private Rigidbody2D rb;
+    private float knockbackTimer;
 
     private void Awake()
     {
-        // Initialize health and state
         currentHealth = maxHealth;
         isDead = false;
 
-        // Ensure animator is assigned
+        rb = GetComponent<Rigidbody2D>();
+        if (rb == null)
+            Debug.LogError($"Rigidbody2D not found on {name}");
+
         if (animator == null)
         {
             animator = GetComponent<Animator>();
             if (animator == null)
+                Debug.LogError($"Animator not assigned on {name}");
+        }
+    }
+
+    private void Update()
+    {
+        // Count down knockback duration
+        if (knockbackTimer > 0)
+        {
+            knockbackTimer -= Time.deltaTime;
+            if (knockbackTimer <= 0f)
             {
-                Debug.LogError("Animator not assigned on " + name);
+                // Restore control – zero out residual velocity if needed
+                rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
             }
         }
     }
 
     /// <summary>
-    /// Applies damage to the skeleton. Triggers hit animation and checks for death.
+    /// Applies damage and knockback. Triggers hit animation and checks for death.
     /// </summary>
     /// <param name="damageAmount">Amount of damage to apply.</param>
-    public void TakeDamage(int damageAmount)
+    /// <param name="hitDirection">Direction from which the hit came (normalized).</param>
+    public void TakeDamage(int damageAmount, Vector2 hitDirection)
     {
         if (isDead) return;
 
         currentHealth -= damageAmount;
 
-        // Play hit reaction animation
+        // Trigger hit animation
         animator.SetTrigger("Hit");
-
         TriggerFeedbackEffects();
 
-        // Optionally, you could play a sound effect or spawn particles here
-        // e.g., AudioSource.PlayClipAtPoint(hitSound, transform.position);
+        // Apply knockback impulse
+        ApplyKnockback(hitDirection);
 
-        // Check for death
         if (currentHealth <= 0)
-        {
             Die();
-        }
     }
 
-    /// <summary>
-    /// Handles death logic: triggers death animation, disables further interactions, and schedules destruction.
-    /// </summary>
+    private void ApplyKnockback(Vector2 hitDirection)
+    {
+        // Disable control for duration
+        knockbackTimer = knockbackDuration;
+
+        // Clear existing velocity then apply an impulse opposite to hit direction
+        rb.linearVelocity = Vector2.zero;
+        Vector2 impulse = hitDirection.normalized * knockbackForce;
+        rb.AddForce(impulse, ForceMode2D.Impulse);
+    }
+
     private void Die()
     {
         isDead = true;
-
-        // Trigger death animation
         animator.SetBool("IsDead", true);
-        AndroidHapticManager.Instance.Vibrate(VibrationIntensity.VeryIntense);
-        CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Strong);
 
-        // Disable collider to prevent further hits
-        Collider col = GetComponent<Collider>();
-        if (col != null)
-        {
-            col.enabled = false;
-        }
+        // Haptics & screen shake
+        AndroidHapticManager.Instance?.Vibrate(VibrationIntensity.VeryIntense);
+        CameraShakeManager.Instance?.ShakeCamera(CameraShakeIntensity.Strong);
 
-        // Disable any movement or AI scripts here if present
-        MonoBehaviour[] scripts = GetComponents<MonoBehaviour>();
-        foreach (var script in scripts)
-        {
-            if (script != this)
-                script.enabled = false;
-        }
+        foreach (var script in GetComponents<MonoBehaviour>())
+            if (script != this) script.enabled = false;
 
-        // Destroy the game object after a delay to allow death animation to play
         Destroy(gameObject, destroyDelay);
     }
 
-    #region Optional Utility
-    // Example of a public method to heal the skeleton (could be called from other scripts)
+    /// <summary>
+    /// Optional: heals the character, clamped at maxHealth.
+    /// </summary>
     public void Heal(int healAmount)
     {
         if (isDead) return;
         currentHealth = Mathf.Min(currentHealth + healAmount, maxHealth);
     }
-    #endregion
 
     private void TriggerFeedbackEffects()
-        {
-            Debug.Log("SHIT CALLED");
-            // Camera shake
-            if (CameraShakeManager.Instance != null)
-            {
-                CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Medium);
-            }
-            else
-            {
-                Debug.LogWarning("CameraShakeManager not found in scene.");
-            }
+    {
+        // Camera shake
+        if (CameraShakeManager.Instance != null)
+            CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Medium);
+        else
+            Debug.LogWarning("CameraShakeManager not found in scene.");
 
-            // Vibration (light tier)
-            if (AndroidHapticManager.Instance != null)
-            {
-                AndroidHapticManager.Instance.Vibrate(VibrationIntensity.Light);
-            }
-            else
-            {
-                Debug.LogWarning("AndroidHapticManager not found in scene.");
-            }
+        // Vibration
+        if (AndroidHapticManager.Instance != null)
+            AndroidHapticManager.Instance.Vibrate(VibrationIntensity.Light);
+        else
+            Debug.LogWarning("AndroidHapticManager not found in scene.");
     }
 }

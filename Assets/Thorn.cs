@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class Thorn : MonoBehaviour
 {
+    int damageAmount = 30;
     void OnTriggerEnter2D(Collider2D collision)
     {
         if(collision.gameObject.CompareTag("Player"))
@@ -9,7 +10,11 @@ public class Thorn : MonoBehaviour
             if(collision.gameObject.TryGetComponent<PlayerHealthManager>(out var playerHealth))
             if(playerHealth != null)
             {
-                playerHealth.TakeDamage(30);    
+                // Randomly choose left or right direction and normalize it
+                Vector2 direction = (Random.value < 0.5f) ? Vector2.left : Vector2.right;
+
+                    // Call the method with damage and direction
+                playerHealth.TakeDamage(damageAmount, direction.normalized);
             }
         }      
     }
@@ -20,7 +25,11 @@ public class Thorn : MonoBehaviour
             if(collision.gameObject.TryGetComponent<PlayerHealthManager>(out var playerHealth))
             if(playerHealth != null)
             {
-                playerHealth.TakeDamage(30);    
+                // Randomly choose left or right direction and normalize it
+                Vector2 direction = (Random.value < 0.5f) ? Vector2.left : Vector2.right;
+
+                    // Call the method with damage and direction
+                playerHealth.TakeDamage(damageAmount, Vector2.zero);
             }
         }      
     }
