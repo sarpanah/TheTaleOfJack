@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -9,6 +10,7 @@ public class PlayerHealthManager : MonoBehaviour
     [Header("Health Settings")]
     [Tooltip("Maximum health of the character.")]
     [SerializeField] private int maxHealth = 100;
+    public int MaxHealth => maxHealth;
 
     [Header("Knockback Settings")]
     [Tooltip("Force of knockback applied when hit.")]
@@ -25,13 +27,16 @@ public class PlayerHealthManager : MonoBehaviour
     [SerializeField] private float destroyDelay = 3f;
 
     private int currentHealth;
+    public int CurrentHealth => currentHealth;
     public bool isDead;
     private Rigidbody2D rb;
     private float knockbackTimer;
+    public event Action<int, int> OnHealthChanged; // (current, max)
 
     private void Awake()
     {
         currentHealth = maxHealth;
+        OnHealthChanged?.Invoke(currentHealth, maxHealth);
         isDead = false;
 
         rb = GetComponent<Rigidbody2D>();
@@ -69,8 +74,9 @@ public class PlayerHealthManager : MonoBehaviour
     {
         if (isDead) return;
 
-        currentHealth -= damageAmount;
-
+        int oldHealth = currentHealth;
+        currentHealth = Mathf.Max(currentHealth - damageAmount, 0);
+        OnHealthChanged?.Invoke(currentHealth, maxHealth);
         // Trigger hit animation
         animator.SetTrigger("Hit");
         TriggerFeedbackEffects();
@@ -115,6 +121,7 @@ public class PlayerHealthManager : MonoBehaviour
     {
         if (isDead) return;
         currentHealth = Mathf.Min(currentHealth + healAmount, maxHealth);
+        OnHealthChanged?.Invoke(currentHealth, maxHealth);
     }
 
     private void TriggerFeedbackEffects()
