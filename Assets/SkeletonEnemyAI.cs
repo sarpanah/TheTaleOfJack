@@ -4,12 +4,13 @@ public class SkeletonEnemyAI2D : MonoBehaviour
 {
     public Transform pointA, pointB, player;
     public float patrolSpeed = 1.5f, chaseSpeed = 3.5f;
-    public float detectionRange = 8f, attackRange = 1.5f;
+    public float detectionRange = 8f, attackRange = 1.5f, chaseRange = 3f;
+    public float idleDuration = 2f; // Cooldown period in seconds
     public Vector2 eyeOffset = new Vector2(0, 0.5f);
     public LayerMask visionMask;
     public float attackDuration = 1f;
 
-    private enum State { Patrol, Chase, Attack }
+    private enum State { Patrol, Chase, Attack, Idle }
     private State state;
 
     private Rigidbody2D rb;
@@ -19,17 +20,18 @@ public class SkeletonEnemyAI2D : MonoBehaviour
 
     private Vector2 patrolTarget;
     private float attackTimer;
+    private float idleTimer; // Timer for idle state cooldown
     private float defaultScaleX;
 
-    private static readonly int HASH_SPEED  = Animator.StringToHash("Speed");
+    private static readonly int HASH_SPEED = Animator.StringToHash("Speed");
     private static readonly int HASH_ATTACK = Animator.StringToHash("Attack");
 
     void Awake()
     {
         // Core components
-        rb          = GetComponent<Rigidbody2D>();
-        anim        = GetComponent<Animator>();
-        sprite      = GetComponent<SpriteRenderer>();
+        rb = GetComponent<Rigidbody2D>();
+        anim = GetComponent<Animator>();
+        sprite = GetComponent<SpriteRenderer>();
         enemyAttack = GetComponent<SkeletonAttackAI>();
 
         // Capture the default X scale for flipping
@@ -43,50 +45,75 @@ public class SkeletonEnemyAI2D : MonoBehaviour
         }
 
         patrolTarget = pointB.position;
-        state        = State.Patrol;
+        state = State.Patrol;
     }
 
     void Update()
     {
-        // If we're attacking, update timer and exit
+        // Handle Attack state
         if (state == State.Attack)
         {
             attackTimer -= Time.deltaTime;
             if (attackTimer <= 0f)
                 EndAttack();
-
             anim.SetFloat(HASH_SPEED, 0f);
             return;
         }
 
-        // Check for player visibility
-        if (CanSeePlayer())
+        bool canSeePlayer = CanSeePlayer();
+
+        // Transition from Patrol to Chase
+        if (state == State.Patrol && canSeePlayer)
         {
             state = State.Chase;
         }
 
-        // Transition to attack if in range
-        float sqrDist = ((Vector2)player.position - (Vector2)transform.position).sqrMagnitude;
-        if (state == State.Chase && sqrDist <= attackRange * attackRange)
+        if (state == State.Chase)
         {
-            state       = State.Attack;
-            attackTimer = attackDuration;
-            enemyAttack.Attack();
-            return;
+            float sqrDist = ((Vector2)player.position - (Vector2)transform.position).sqrMagnitude;
+            // Transition to Attack if within range
+            if (sqrDist <= attackRange * attackRange)
+            {
+                state = State.Attack;
+                attackTimer = attackDuration;
+                enemyAttack.Attack();
+            }
+            // Transition to Idle if player is too far
+            else if (sqrDist > chaseRange * chaseRange)
+            {
+                state = State.Idle;
+                idleTimer = idleDuration;
+            }
+        }
+        else if (state == State.Idle)
+        {
+            idleTimer -= Time.deltaTime;
+            float sqrDist = ((Vector2)player.position - (Vector2)transform.position).sqrMagnitude;
+            // Resume Chase if player is visible and within chase range
+            if (canSeePlayer && sqrDist <= chaseRange * chaseRange)
+            {
+                state = State.Chase;
+            }
+            // Return to Patrol after cooldown if no chase condition met
+            else if (idleTimer <= 0f)
+            {
+                state = State.Patrol;
+                float distA = Vector2.Distance(transform.position, pointA.position);
+                float distB = Vector2.Distance(transform.position, pointB.position);
+                patrolTarget = (distA < distB) ? pointA.position : pointB.position;
+            }
         }
 
-        // Lost sight: resume patrol
-        if (state == State.Chase && !CanSeePlayer())
+        // Update animation
+        if (state == State.Attack || state == State.Idle)
         {
-            state = State.Patrol;
-            float distA = Vector2.Distance(transform.position, pointA.position);
-            float distB = Vector2.Distance(transform.position, pointB.position);
-            patrolTarget = (distA < distB) ? pointA.position : pointB.position;
+            anim.SetFloat(HASH_SPEED, 0f);
         }
-
-        // Update animation blend based on speed
-        float currentSpeed = Mathf.Abs(rb.linearVelocity.x);
-        anim.SetFloat(HASH_SPEED, currentSpeed / chaseSpeed);
+        else
+        {
+            float currentSpeed = Mathf.Abs(rb.linearVelocity.x);
+            anim.SetFloat(HASH_SPEED, currentSpeed / chaseSpeed);
+        }
     }
 
     void FixedUpdate()
@@ -100,6 +127,7 @@ public class SkeletonEnemyAI2D : MonoBehaviour
                 MoveTowards(player.position, chaseSpeed);
                 break;
             case State.Attack:
+            case State.Idle:
                 rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
                 break;
         }
@@ -142,19 +170,43 @@ public class SkeletonEnemyAI2D : MonoBehaviour
     }
 
     private bool CanSeePlayer()
+{
+    if (player == null)
     {
-        if(player==null){
-            return false;
-        }
-        Vector2 eyePos = (Vector2)transform.position + eyeOffset;
-        Vector2 dir    = ((Vector2)player.position - eyePos).normalized;
-        RaycastHit2D hit = Physics2D.Raycast(eyePos, dir, detectionRange, visionMask);
-
-        bool canSee = (hit.collider != null && hit.collider.transform == player);
-        Debug.DrawRay(eyePos, dir * detectionRange, canSee ? Color.green : Color.red);
-        return canSee;
+        return false;
     }
 
+    // Calculate squared distance to player for efficiency
+    Vector2 toPlayer = (Vector2)player.position - (Vector2)transform.position;
+    float sqrDist = toPlayer.sqrMagnitude;
+    if (sqrDist > detectionRange * detectionRange)
+    {
+        return false; // Player is too far, no need for raycasts
+    }
+
+    // Determine facing direction based on enemy's scale (positive x = right, negative x = left)
+    Vector2 eyePos = (Vector2)transform.position + eyeOffset;
+    Vector2 forwardDir = new Vector2(Mathf.Sign(transform.localScale.x), 0);
+    Vector2 backwardDir = -forwardDir;
+
+    // Calculate backward detection range
+    float backwardDetectionRange = detectionRange / 2f;
+
+    // Cast ray in forward direction
+    RaycastHit2D forwardHit = Physics2D.Raycast(eyePos, forwardDir, detectionRange, visionMask);
+    bool forwardCanSee = (forwardHit.collider != null && forwardHit.collider.transform == player);
+
+    // Cast ray in backward direction with half the range
+    RaycastHit2D backwardHit = Physics2D.Raycast(eyePos, backwardDir, backwardDetectionRange, visionMask);
+    bool backwardCanSee = (backwardHit.collider != null && backwardHit.collider.transform == player);
+
+    // Visualize both rays for debugging
+    Debug.DrawRay(eyePos, forwardDir * detectionRange, forwardCanSee ? Color.green : Color.red);
+    Debug.DrawRay(eyePos, backwardDir * backwardDetectionRange, backwardCanSee ? Color.green : Color.red);
+
+    // Return true if player is seen in either direction
+    return forwardCanSee || backwardCanSee;
+}
     public void EndAttack()
     {
         state = CanSeePlayer() ? State.Chase : State.Patrol;
@@ -173,6 +225,8 @@ public class SkeletonEnemyAI2D : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position + (Vector3)eyeOffset, detectionRange);
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(transform.position, chaseRange);
         if (pointA && pointB)
         {
             Gizmos.color = Color.cyan;
@@ -183,10 +237,12 @@ public class SkeletonEnemyAI2D : MonoBehaviour
 #if UNITY_EDITOR
     void OnValidate()
     {
-        if (patrolSpeed < 0)  patrolSpeed = 0;
-        if (chaseSpeed  < 0)  chaseSpeed  = 0;
+        if (patrolSpeed < 0) patrolSpeed = 0;
+        if (chaseSpeed < 0) chaseSpeed = 0;
         if (detectionRange < 0) detectionRange = 0;
-        if (attackRange    < 0) attackRange    = 0;
+        if (attackRange < 0) attackRange = 0;
+        if (chaseRange < 0) chaseRange = 0;
+        if (idleDuration < 0) idleDuration = 0;
         if (attackDuration < 0) attackDuration = 0;
     }
 #endif

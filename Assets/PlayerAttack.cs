@@ -18,9 +18,8 @@ public class PlayerAttack : MonoBehaviour
     [Header("Input")]
     [SerializeField] private TouchButton attackButton;        // Reference to the attack button
 
-    [Header("Feedback Effects")]
-    [SerializeField] private float shakeDuration = 0.2f;      // Duration of the camera shake
-    [SerializeField] private float shakeMagnitude = 0.05f;    // Magnitude of the camera shake
+    [Header("Hit Stop Settings")]
+    [SerializeField] private float hitStopDuration = 0.1f;    // Duration of hit stop in seconds (100ms default)
 
     private string originalTag;
     private int    originalLayer;
@@ -33,7 +32,7 @@ public class PlayerAttack : MonoBehaviour
         InitializeComponents();
         CacheOriginalSettings();
     }
-
+    
     private void InitializeComponents()
     {
         animator = GetComponent<Animator>();
@@ -57,7 +56,6 @@ public class PlayerAttack : MonoBehaviour
 
     private void CacheOriginalSettings()
     {
-        // Store the Player GameObject's original tag and layer so we can restore them later
         originalTag   = gameObject.tag;
         originalLayer = gameObject.layer;
     }
@@ -80,13 +78,11 @@ public class PlayerAttack : MonoBehaviour
         lastAttackTime = Time.time;
     }
 
-    // Called via Animation Event
     public void EnableHitbox()
     {
         if (attackHitbox != null)
             attackHitbox.enabled = true;
 
-        // Switch Player GameObject to a non‑colliding tag & layer
         gameObject.tag = nonCollisionTag;
         int layerIdx = LayerMask.NameToLayer(nonCollisionLayerName);
         if (layerIdx >= 0)
@@ -95,13 +91,11 @@ public class PlayerAttack : MonoBehaviour
             Debug.LogWarning($"Layer '{nonCollisionLayerName}' not found in Project Settings.", this);
     }
 
-    // Called via Animation Event
     public void DisableHitbox()
     {
         if (attackHitbox != null)
             attackHitbox.enabled = false;
 
-        // Restore original tag & layer
         gameObject.tag   = originalTag;
         gameObject.layer = originalLayer;
     }
@@ -127,39 +121,39 @@ public class PlayerAttack : MonoBehaviour
             var box = collision.GetComponent<Box>();
             if (box != null)
             {
-                Vector2 attackDirection = transform.localScale.x > 0 ? Vector2.right : Vector2.left; // or use velocity or facing
+                Vector2 attackDirection = transform.localScale.x > 0 ? Vector2.right : Vector2.left;
                 box.BreakBox(attackDirection);
             }
         }
 
-        // Uncomment to trigger camera shake and vibration on a successful hit:
-        // if (hitSuccess) TriggerFeedbackEffects();
+        if (hitSuccess && HitStopManager.Instance != null)
+        {
+            HitStopManager.Instance.TriggerHitStop(hitStopDuration);
+        }
+
+        //Uncomment to trigger camera shake and vibration on a successful hit:
+        if (hitSuccess) TriggerFeedbackEffects();
     }
 
-    // private void TriggerFeedbackEffects()
-    // {
-    //     // Camera shake
-    //     if (CameraShakeManager.Instance != null)
-    //         CameraShakeManager.Instance.ShakeCamera(shakeMagnitude, shakeDuration);
-    //     else
-    //         Debug.LogWarning("CameraShakeManager not found in scene.");
-    //
-    //     // Vibration (light tier)
-    //     if (VibrationManager.Instance != null)
-    //         VibrationManager.Instance.Vibrate(VibrationIntensity.Light);
-    //     else
-    //         Debug.LogWarning("VibrationManager not found in scene.");
-    // }
+    private void TriggerFeedbackEffects()
+    {
+        if (CameraShakeManager.Instance != null)
+            CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.VeryLight);
+        else
+            Debug.LogWarning("CameraShakeManager not found in scene.");
+
+        if (AndroidHapticManager.Instance != null)
+            AndroidHapticManager.Instance.Vibrate(VibrationIntensity.Light);
+        else
+            Debug.LogWarning("AndroidHapticManager not found in scene.");
+    }
 
 #if UNITY_EDITOR
     private void OnValidate()
     {
-        // Clamp numeric values
         attackCooldown = Mathf.Max(0f, attackCooldown);
-        shakeDuration  = Mathf.Max(0f, shakeDuration);
-        shakeMagnitude = Mathf.Max(0f, shakeMagnitude);
+        hitStopDuration = Mathf.Max(0f, hitStopDuration);
 
-        // Warn if references are missing
         if (attackHitbox == null)
             Debug.LogWarning("Attack Hitbox is not assigned on PlayerAttack.", this);
         if (attackButton == null)

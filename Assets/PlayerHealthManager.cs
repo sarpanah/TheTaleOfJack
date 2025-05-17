@@ -1,9 +1,6 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// Manages the health, damage reactions, knockback, and death behavior for a 2D character.
-/// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerHealthManager : MonoBehaviour
 {
@@ -26,12 +23,15 @@ public class PlayerHealthManager : MonoBehaviour
     [Tooltip("Time (in seconds) before the character is destroyed after death.")]
     [SerializeField] private float destroyDelay = 3f;
 
+    [Header("Hit Stop Settings")]
+    [SerializeField] private float hitStopDuration = 0.1f;    // Duration of hit stop in seconds (100ms default)
+
     private int currentHealth;
     public int CurrentHealth => currentHealth;
     public bool isDead;
     private Rigidbody2D rb;
     private float knockbackTimer;
-    public event Action<int, int> OnHealthChanged; // (current, max)
+    public event Action<int, int> OnHealthChanged;
 
     private void Awake()
     {
@@ -53,23 +53,16 @@ public class PlayerHealthManager : MonoBehaviour
 
     private void Update()
     {
-        // Count down knockback duration
         if (knockbackTimer > 0)
         {
             knockbackTimer -= Time.deltaTime;
             if (knockbackTimer <= 0f)
             {
-                // Restore control – zero out residual velocity if needed
                 rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
             }
         }
     }
 
-    /// <summary>
-    /// Applies damage and knockback. Triggers hit animation and checks for death.
-    /// </summary>
-    /// <param name="damageAmount">Amount of damage to apply.</param>
-    /// <param name="hitDirection">Direction from which the hit came (normalized).</param>
     public void TakeDamage(int damageAmount, Vector2 hitDirection)
     {
         if (isDead) return;
@@ -77,11 +70,15 @@ public class PlayerHealthManager : MonoBehaviour
         int oldHealth = currentHealth;
         currentHealth = Mathf.Max(currentHealth - damageAmount, 0);
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
-        // Trigger hit animation
+        
+        if (HitStopManager.Instance != null)
+        {
+            HitStopManager.Instance.TriggerHitStop(hitStopDuration);
+        }
+
         animator.SetTrigger("Hit");
         TriggerFeedbackEffects();
 
-        // Apply knockback impulse
         ApplyKnockback(hitDirection);
 
         if (currentHealth <= 0)
@@ -90,10 +87,7 @@ public class PlayerHealthManager : MonoBehaviour
 
     private void ApplyKnockback(Vector2 hitDirection)
     {
-        // Disable control for duration
         knockbackTimer = knockbackDuration;
-
-        // Clear existing velocity then apply an impulse opposite to hit direction
         rb.linearVelocity = Vector2.zero;
         Vector2 impulse = hitDirection.normalized * knockbackForce;
         rb.AddForce(impulse, ForceMode2D.Impulse);
@@ -104,7 +98,6 @@ public class PlayerHealthManager : MonoBehaviour
         isDead = true;
         animator.SetBool("IsDead", true);
 
-        // Haptics & screen shake
         AndroidHapticManager.Instance?.Vibrate(VibrationIntensity.VeryIntense);
         CameraShakeManager.Instance?.ShakeCamera(CameraShakeIntensity.Strong);
 
@@ -114,9 +107,6 @@ public class PlayerHealthManager : MonoBehaviour
         Destroy(gameObject, destroyDelay);
     }
 
-    /// <summary>
-    /// Optional: heals the character, clamped at maxHealth.
-    /// </summary>
     public void Heal(int healAmount)
     {
         if (isDead) return;
@@ -126,13 +116,11 @@ public class PlayerHealthManager : MonoBehaviour
 
     private void TriggerFeedbackEffects()
     {
-        // Camera shake
         if (CameraShakeManager.Instance != null)
-            CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Medium);
+            CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.VeryLight);
         else
             Debug.LogWarning("CameraShakeManager not found in scene.");
 
-        // Vibration
         if (AndroidHapticManager.Instance != null)
             AndroidHapticManager.Instance.Vibrate(VibrationIntensity.Light);
         else

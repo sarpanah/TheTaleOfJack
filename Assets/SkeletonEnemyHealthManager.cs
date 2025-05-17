@@ -77,7 +77,7 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
         isDead = true;
 
         // Trigger death animation
-        animator.SetTrigger("Death");
+        animator.SetBool("isDead", isDead);
 
         // Disable collider to prevent further hits
         Collider col = GetComponent<Collider>();
