@@ -21,6 +21,8 @@ public class PlayerAttack : MonoBehaviour
 
     [Header("Input")]
     [SerializeField] private TouchButton attackButton;        // Reference to the attack button
+    private bool wasAttackPressedLastFrame = false;  // For edge detection
+
 
     [Header("Hit Stop Settings")]
     [SerializeField] private float hitStopDuration = 0.1f;    // Duration of hit stop in seconds (100ms default)
@@ -33,11 +35,10 @@ public class PlayerAttack : MonoBehaviour
     private Animator            animator;
 
     public event System.Action<int, int> OnFatigueChanged;  // current, max
+    public event System.Action OnFatigueAttackAttempt;      // New event for fatigue attack attempt
 
-public int MaxFatigue => 3;
-public int CurrentFatigue => fatigueCounter;
-
-
+    public int MaxFatigue => 3;
+    public int CurrentFatigue => fatigueCounter;
     private void Start()
     {
         InitializeComponents();
@@ -84,13 +85,25 @@ public int CurrentFatigue => fatigueCounter;
 }
 
 
-        // Check if player can attack: button pressed, cooldown passed, and not fatigued
-        if (attackButton.isPressed && Time.time >= lastAttackTime + attackCooldown && fatigueCounter < 3)
+        // Detect initial button press
+        bool isAttackJustPressed = attackButton.isPressed && !wasAttackPressedLastFrame;
+        wasAttackPressedLastFrame = attackButton.isPressed;
+
+        if (isAttackJustPressed)
         {
-            Attack();
-            fatigueCounter++;  // Increment fatigue counter after attack
-            attackButton.isPressed = false;
-            OnFatigueChanged?.Invoke(fatigueCounter, MaxFatigue);
+            if (Time.time >= lastAttackTime + attackCooldown && fatigueCounter < MaxFatigue)
+            {
+                // Perform attack and increment fatigue
+                Attack();
+                fatigueCounter++;
+                lastAttackTime = Time.time;
+                OnFatigueChanged?.Invoke(fatigueCounter, MaxFatigue);
+            }
+            else if (fatigueCounter >= MaxFatigue)
+            {
+                // Player is already fatigued and tried to attack
+                OnFatigueAttackAttempt?.Invoke();
+            }
         }
     }
 
