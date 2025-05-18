@@ -1,13 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// Handles player attack logic, including hitbox management, cooldowns, and feedback effects.
+/// Handles player attack logic, including hitbox management, cooldowns, fatigue, and feedback effects.
 /// </summary>
 public class PlayerAttack : MonoBehaviour
 {
     [Header("Attack Settings")]
     [SerializeField] private PolygonCollider2D attackHitbox;  // Reference to the attack hitbox
     [SerializeField] private float attackCooldown = 0.5f;     // Cooldown between attacks
+
+    [Header("Fatigue Settings")]
+    [Tooltip("Time in seconds the player needs to rest without attacking to reset fatigue.")]
+    [SerializeField] private float restTime = 1.5f;           // Time to rest to reset fatigue
 
     [Header("No-Collision Settings")]
     [Tooltip("Tag to assign to the Player GameObject when attack is active")]
@@ -24,8 +28,15 @@ public class PlayerAttack : MonoBehaviour
     private string originalTag;
     private int    originalLayer;
     private float  lastAttackTime;
+    private int    fatigueCounter = 0;                        // Counter for consecutive attacks
     private PlayerHealthManager playerHealthManager;
     private Animator            animator;
+
+    public event System.Action<int, int> OnFatigueChanged;  // current, max
+
+public int MaxFatigue => 3;
+public int CurrentFatigue => fatigueCounter;
+
 
     private void Start()
     {
@@ -65,10 +76,21 @@ public class PlayerAttack : MonoBehaviour
         if (playerHealthManager == null || playerHealthManager.isDead) return;
         if (attackButton == null || animator == null)             return;
 
-        if (attackButton.isPressed && Time.time >= lastAttackTime + attackCooldown)
+        // Reset fatigue counter if enough time has passed since last attack
+        if (Time.time - lastAttackTime >= restTime && fatigueCounter > 0)
+{
+    fatigueCounter = 0;
+    OnFatigueChanged?.Invoke(fatigueCounter, MaxFatigue);
+}
+
+
+        // Check if player can attack: button pressed, cooldown passed, and not fatigued
+        if (attackButton.isPressed && Time.time >= lastAttackTime + attackCooldown && fatigueCounter < 3)
         {
             Attack();
+            fatigueCounter++;  // Increment fatigue counter after attack
             attackButton.isPressed = false;
+            OnFatigueChanged?.Invoke(fatigueCounter, MaxFatigue);
         }
     }
 
@@ -131,7 +153,7 @@ public class PlayerAttack : MonoBehaviour
             HitStopManager.Instance.TriggerHitStop(hitStopDuration);
         }
 
-        //Uncomment to trigger camera shake and vibration on a successful hit:
+        // Uncomment to trigger camera shake and vibration on a successful hit:
         if (hitSuccess) TriggerFeedbackEffects();
     }
 
@@ -153,6 +175,7 @@ public class PlayerAttack : MonoBehaviour
     {
         attackCooldown = Mathf.Max(0f, attackCooldown);
         hitStopDuration = Mathf.Max(0f, hitStopDuration);
+        restTime = Mathf.Max(0f, restTime);  // Ensure restTime is non-negative
 
         if (attackHitbox == null)
             Debug.LogWarning("Attack Hitbox is not assigned on PlayerAttack.", this);
