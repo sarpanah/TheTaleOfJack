@@ -26,6 +26,8 @@ public class SkeletonEnemyAI2D : MonoBehaviour
     private static readonly int HASH_SPEED = Animator.StringToHash("Speed");
     private static readonly int HASH_ATTACK = Animator.StringToHash("Attack");
 
+    // Add this field
+    [SerializeField] private EnemyHUDController hudController;
     void Awake()
     {
         // Core components
@@ -33,6 +35,8 @@ public class SkeletonEnemyAI2D : MonoBehaviour
         anim = GetComponent<Animator>();
         sprite = GetComponent<SpriteRenderer>();
         enemyAttack = GetComponent<SkeletonAttackAI>();
+         if (hudController == null)
+            hudController = GetComponentInChildren<EnemyHUDController>();
 
         // Capture the default X scale for flipping
         defaultScaleX = transform.localScale.x;
@@ -167,6 +171,10 @@ public class SkeletonEnemyAI2D : MonoBehaviour
         Vector3 scale = transform.localScale;
         scale.x = defaultScaleX * dir;
         transform.localScale = scale;
+
+        // Flip HUD to match enemy direction
+        if (hudController != null)
+            hudController.MatchParentDirection(dir);
     }
 
     private bool CanSeePlayer()

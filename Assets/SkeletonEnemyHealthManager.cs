@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Timeline;
 
@@ -8,7 +9,8 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
 {
     [Header("Health Settings")]    
     [Tooltip("Maximum health of the skeleton.")]
-    [SerializeField] private int maxHealth = 100;
+    [SerializeField] private int maxHealth = 100; public int MaxHealth => maxHealth;
+    private int currentHealth;  public int CurrentHealth => currentHealth;
 
     [Header("Animation Settings")]    
     [Tooltip("Animator component for handling hit and death animations.")]
@@ -24,13 +26,15 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
 
     public GameObject coinPrefab;
 
-    private int currentHealth;
     private bool isDead;
 
+
+    public event Action<int, int> OnHealthChanged;
     private void Awake()
     {
         // Initialize health and state
         currentHealth = maxHealth;
+        OnHealthChanged?.Invoke(currentHealth, maxHealth);
         isDead = false;
 
         // Ensure animator is assigned
@@ -53,7 +57,7 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
         if (isDead) return;
 
         currentHealth -= damageAmount;
-
+        OnHealthChanged?.Invoke(currentHealth, maxHealth);
         // Play hit reaction animation
         animator.SetTrigger("Hit");
 
