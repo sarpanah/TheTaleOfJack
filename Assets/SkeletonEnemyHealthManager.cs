@@ -140,7 +140,7 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
             // Camera shake
             if (CameraShakeManager.Instance != null)
             {
-                CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.Medium);
+                CameraShakeManager.Instance.ShakeCamera(CameraShakeIntensity.VeryLight);
             }
             else
             {

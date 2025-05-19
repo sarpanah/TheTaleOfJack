@@ -46,7 +46,7 @@ public class CameraShakeManager : MonoBehaviour
         switch (intensity)
         {
             case CameraShakeIntensity.VeryLight:
-                magnitude = 0.005f;
+                magnitude = 0.0000005f;
                 duration = 0.01f;
                 break;
             case CameraShakeIntensity.Light:
