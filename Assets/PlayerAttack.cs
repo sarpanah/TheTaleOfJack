@@ -37,7 +37,7 @@ public class PlayerAttack : MonoBehaviour
     public event System.Action<int, int> OnFatigueChanged;  // current, max
     public event System.Action OnFatigueAttackAttempt;      // New event for fatigue attack attempt
 
-    public int MaxFatigue => 3;
+    public int MaxFatigue => 4;
     public int CurrentFatigue => fatigueCounter;
     private void Start()
     {
@@ -146,8 +146,13 @@ public class PlayerAttack : MonoBehaviour
             var enemyHealth = collision.GetComponent<SkeletonEnemyHealthManager>();
             if (enemyHealth != null)
             {
-                enemyHealth.TakeDamage(20);
+
+                float enemyVsPlayerDistance = Vector2.Distance(collision.gameObject.transform.position, transform.position);
+                int damage = GetDamageBasedOnDistance(enemyVsPlayerDistance);
+                enemyHealth.TakeDamage(damage);
                 hitSuccess = true;
+                Debug.Log(damage);
+                
             }
         }
 
@@ -169,6 +174,17 @@ public class PlayerAttack : MonoBehaviour
         // Uncomment to trigger camera shake and vibration on a successful hit:
         if (hitSuccess) TriggerFeedbackEffects();
     }
+
+    private int GetDamageBasedOnDistance(float distance)
+    {
+        if (distance <= 1.2f)
+            return UnityEngine.Random.Range(45, 51); // upper bound is exclusive
+        else if (distance <= 1.4f)
+            return UnityEngine.Random.Range(25, 31);
+        else
+            return UnityEngine.Random.Range(18, 21);
+    }
+
 
     private void TriggerFeedbackEffects()
     {
