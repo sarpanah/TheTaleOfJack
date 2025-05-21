@@ -1,21 +1,26 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Threading.Tasks;
 
 public class HUDController : MonoBehaviour
 {
     [SerializeField] private Image healthBarFillImage; // Assign your HealthBar image here
     [SerializeField] private Image powerBarFillImage;
     [SerializeField] private TextMeshProUGUI healthText;
+    [SerializeField] private TextMeshProUGUI coinText;
     private PlayerHealthManager playerHealth;
     private PlayerAttack playerAttack;
     [SerializeField] private GameObject fatigueMessage;  // Reference to your fatigue UI GameObject
     private float messageDisplayDuration = 2f;  // How long the message stays visible
     private float messageHideTime;              // When to hide the message
-     private bool isFatigued; // New field to track fatigue state
+    private bool isFatigued; // New field to track fatigue state;
+
     private void Start()
     {
         playerHealth = FindFirstObjectByType<PlayerHealthManager>();
+
+        //Subscribing to PlayerHealth
         if (playerHealth == null)
         {
             Debug.LogError("No PlayerHealthManager in scene!");
@@ -24,7 +29,8 @@ public class HUDController : MonoBehaviour
         }
         playerHealth.OnHealthChanged += UpdateHealthUI;
         UpdateHealthUI(playerHealth.CurrentHealth, playerHealth.MaxHealth);
-        
+
+        //Subscribing to PlayerAttack
         var playerAttack = FindFirstObjectByType<PlayerAttack>();
         if (playerAttack != null)
         {
@@ -37,8 +43,16 @@ public class HUDController : MonoBehaviour
             Debug.LogWarning("No PlayerAttack found in scene.");
         }
 
+        var gameManager = GameManager.Instance;
+        if (gameManager != null)
+        {
+            gameManager.OnCoinChanged += UpdateCoins;
+            UpdateCoins(gameManager.Coins);
+        }
+        
+
     }
-private void Update()
+    private void Update()
     {
         if (fatigueMessage.activeSelf && Time.time >= messageHideTime || !isFatigued)
         {
@@ -51,7 +65,7 @@ private void Update()
             playerHealth.OnHealthChanged -= UpdateHealthUI;
         if (playerAttack != null)
             playerAttack.OnFatigueChanged -= UpdatePowerBar;
-    playerAttack.OnFatigueAttackAttempt -= ShowFatigueMessage;  // Unsubscribe  
+        playerAttack.OnFatigueAttackAttempt -= ShowFatigueMessage;  // Unsubscribe  
     }
 
     private void UpdateHealthUI(int current, int max)
@@ -67,7 +81,7 @@ private void Update()
         powerBarFillImage.fillAmount = fill;
         isFatigued = (current >= 3);
     }
-private void ShowFatigueMessage()
+    private void ShowFatigueMessage()
     {
         if (!fatigueMessage.activeSelf)
         {
@@ -79,5 +93,10 @@ private void ShowFatigueMessage()
     private void HideFatigueMessage()
     {
         fatigueMessage.SetActive(false);
+    }
+
+    private void UpdateCoins(int coins)
+    {
+        coinText.text = $"Coins: {coins}";;
     }
 }

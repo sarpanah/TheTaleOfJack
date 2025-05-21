@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class Coin : MonoBehaviour
 {
+
     public float throwForce = 5f;
     private void OnTriggerEnter2D(Collider2D collision)
     {
