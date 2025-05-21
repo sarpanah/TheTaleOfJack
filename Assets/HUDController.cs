@@ -24,6 +24,7 @@ public class HUDController : MonoBehaviour
         }
         playerHealth.OnHealthChanged += UpdateHealthUI;
         UpdateHealthUI(playerHealth.CurrentHealth, playerHealth.MaxHealth);
+        
         var playerAttack = FindFirstObjectByType<PlayerAttack>();
         if (playerAttack != null)
         {

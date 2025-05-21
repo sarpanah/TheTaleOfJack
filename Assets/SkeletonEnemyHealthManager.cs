@@ -30,6 +30,7 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
 
 
     public event Action<int, int> OnHealthChanged;
+    public event Action<int> OnDamaged;
     private void Awake()
     {
         // Initialize health and state
@@ -58,6 +59,7 @@ public class SkeletonEnemyHealthManager : MonoBehaviour
 
         currentHealth -= damageAmount;
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
+        OnDamaged?.Invoke(damageAmount);
         // Play hit reaction animation
         animator.SetTrigger("Hit");
 
