@@ -169,7 +169,7 @@ public class PlayerMovement : MonoBehaviour
     {
         if (isClimbing)
         {
-            rb.linearVelocity = new Vector2(0f, movement.y * climbSpeed);
+            rb.linearVelocity = new Vector2(0f, climbSpeed);
         }
         else if (isTouchingWall && ((rb.linearVelocity.x > 0f && isFacingRight) || (rb.linearVelocity.x < 0f && !isFacingRight)))
         {

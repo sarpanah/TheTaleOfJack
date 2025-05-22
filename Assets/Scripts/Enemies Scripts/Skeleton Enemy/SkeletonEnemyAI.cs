@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class SkeletonEnemyAI2D : MonoBehaviour
 {
+    #region Public Fields //TODO make them serilizable and what's serializable? and best way to mass serialize a public section!
     public Transform pointA, pointB, player;
     public float patrolSpeed = 1.5f, chaseSpeed = 3.5f;
     public float detectionRange = 8f, attackRange = 1.5f, chaseRange = 3f;
@@ -10,6 +11,9 @@ public class SkeletonEnemyAI2D : MonoBehaviour
     public LayerMask visionMask;
     public float attackDuration = 1f;
 
+    #endregion
+
+    #region  Private Variables
     private enum State { Patrol, Chase, Attack, Idle }
     private State state;
 
@@ -25,9 +29,11 @@ public class SkeletonEnemyAI2D : MonoBehaviour
 
     private static readonly int HASH_SPEED = Animator.StringToHash("Speed");
     private static readonly int HASH_ATTACK = Animator.StringToHash("Attack");
-
+    #endregion
     // Add this field
     [SerializeField] private EnemyHUDController hudController;
+
+    #region Unity Methods
     void Awake()
     {
         // Core components
@@ -80,6 +86,7 @@ public class SkeletonEnemyAI2D : MonoBehaviour
             {
                 state = State.Attack;
                 attackTimer = attackDuration;
+                if(CanAttackPlayer())
                 enemyAttack.Attack();
             }
             // Transition to Idle if player is too far
@@ -137,6 +144,9 @@ public class SkeletonEnemyAI2D : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region Patrol Logic
     private void DoPatrol()
     {
         Vector2 dirVec = patrolTarget - (Vector2)transform.position;
@@ -150,6 +160,9 @@ public class SkeletonEnemyAI2D : MonoBehaviour
             patrolTarget = (patrolTarget == (Vector2)pointA.position) ? pointB.position : pointA.position;
     }
 
+    #endregion
+
+    #region Chase Logic
     private void MoveTowards(Vector2 target, float speed)
     {
         Vector2 delta = target - (Vector2)transform.position;
@@ -165,7 +178,9 @@ public class SkeletonEnemyAI2D : MonoBehaviour
         // Flip using scale.x
         FlipScaleX(Mathf.Sign(delta.x));
     }
+    #endregion
 
+    #region Flip Logic
     private void FlipScaleX(float dir)
     {
         Vector3 scale = transform.localScale;
@@ -176,45 +191,61 @@ public class SkeletonEnemyAI2D : MonoBehaviour
         if (hudController != null)
             hudController.MatchParentDirection(dir);
     }
+    #endregion
 
+    #region Raycast & Detect
     private bool CanSeePlayer()
-{
-    if (player == null)
     {
-        return false;
+        if (player == null)
+        {
+            return false;
+        }
+
+        // Calculate squared distance to player for efficiency
+        Vector2 toPlayer = (Vector2)player.position - (Vector2)transform.position;
+        float sqrDist = toPlayer.sqrMagnitude;
+        if (sqrDist > detectionRange * detectionRange)
+        {
+            return false; // Player is too far, no need for raycasts
+        }
+
+        // Determine facing direction based on enemy's scale (positive x = right, negative x = left)
+        Vector2 eyePos = (Vector2)transform.position + eyeOffset;
+        Vector2 forwardDir = new Vector2(Mathf.Sign(transform.localScale.x), 0);
+        Vector2 backwardDir = -forwardDir;
+
+        // Calculate backward detection range
+        float backwardDetectionRange = detectionRange / 2f;
+
+        // Cast ray in forward direction
+        RaycastHit2D forwardHit = Physics2D.Raycast(eyePos, forwardDir, detectionRange, visionMask);
+        bool forwardCanSee = (forwardHit.collider != null && forwardHit.collider.transform == player);
+
+        // Cast ray in backward direction with half the range
+        RaycastHit2D backwardHit = Physics2D.Raycast(eyePos, backwardDir, backwardDetectionRange, visionMask);
+        bool backwardCanSee = (backwardHit.collider != null && backwardHit.collider.transform == player);
+
+        // Visualize both rays for debugging
+        Debug.DrawRay(eyePos, forwardDir * detectionRange, forwardCanSee ? Color.green : Color.red);
+        Debug.DrawRay(eyePos, backwardDir * backwardDetectionRange, backwardCanSee ? Color.green : Color.red);
+
+        // Return true if player is seen in either direction
+        return forwardCanSee || backwardCanSee;
     }
 
-    // Calculate squared distance to player for efficiency
-    Vector2 toPlayer = (Vector2)player.position - (Vector2)transform.position;
-    float sqrDist = toPlayer.sqrMagnitude;
-    if (sqrDist > detectionRange * detectionRange)
+    private bool CanAttackPlayer()
     {
-        return false; // Player is too far, no need for raycasts
+        Vector2 eyePos = (Vector2)transform.position + eyeOffset;
+        Vector2 forwardDir = new Vector2(Mathf.Sign(transform.localScale.x), 0);
+        
+        // Cast ray in forward direction
+        RaycastHit2D forwardHit = Physics2D.Raycast(eyePos, forwardDir, detectionRange, visionMask);
+        bool forwardCanSee = (forwardHit.collider != null && forwardHit.collider.transform == player);
+        return forwardCanSee;
     }
+    #endregion
 
-    // Determine facing direction based on enemy's scale (positive x = right, negative x = left)
-    Vector2 eyePos = (Vector2)transform.position + eyeOffset;
-    Vector2 forwardDir = new Vector2(Mathf.Sign(transform.localScale.x), 0);
-    Vector2 backwardDir = -forwardDir;
-
-    // Calculate backward detection range
-    float backwardDetectionRange = detectionRange / 2f;
-
-    // Cast ray in forward direction
-    RaycastHit2D forwardHit = Physics2D.Raycast(eyePos, forwardDir, detectionRange, visionMask);
-    bool forwardCanSee = (forwardHit.collider != null && forwardHit.collider.transform == player);
-
-    // Cast ray in backward direction with half the range
-    RaycastHit2D backwardHit = Physics2D.Raycast(eyePos, backwardDir, backwardDetectionRange, visionMask);
-    bool backwardCanSee = (backwardHit.collider != null && backwardHit.collider.transform == player);
-
-    // Visualize both rays for debugging
-    Debug.DrawRay(eyePos, forwardDir * detectionRange, forwardCanSee ? Color.green : Color.red);
-    Debug.DrawRay(eyePos, backwardDir * backwardDetectionRange, backwardCanSee ? Color.green : Color.red);
-
-    // Return true if player is seen in either direction
-    return forwardCanSee || backwardCanSee;
-}
+    #region End Attack Logic
     public void EndAttack()
     {
         state = CanSeePlayer() ? State.Chase : State.Patrol;
@@ -226,7 +257,7 @@ public class SkeletonEnemyAI2D : MonoBehaviour
             patrolTarget = (distA < distB) ? pointA.position : pointB.position;
         }
     }
-
+    #endregion
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;

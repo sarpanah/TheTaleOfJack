@@ -31,8 +31,14 @@ public class EnemyHUDController : MonoBehaviour
 
     private void UpdateHealthUI(int current, int max)
     {
-        float fill = (float)current / max;
-        healthBarFillImage.fillAmount = fill;
+        // Prevent divide-by-zero
+    if (max <= 0) max = 1;
+
+    // Clamp currentHealth to [0, max]
+    current = Mathf.Clamp(current, 0, max);
+
+    float fill = (float)current / max;
+    healthBarFillImage.fillAmount = Mathf.Clamp01(fill);
     }
     public void MatchParentDirection(float directionSign)
     {
